@@ -46,3 +46,16 @@ python -m src.run_cypher "MATCH (n) RETURN n LIMIT 5"
 ```
 python -m src.ask "What is the coverage decision for CPT 12345?"
 ```
+
+- Ingest/update KG from payer policy URLs:
+
+```
+python -m src.ingest --url "https://insurer.com/policies/PA-1234"
+python -m src.ingest --urls-file urls.txt
+```
+
+- Evaluate KG quality metrics:
+
+```
+python -m src.evaluate --format json
+```
