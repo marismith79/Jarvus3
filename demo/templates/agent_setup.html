@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Setup - Jarvus Demo{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">Agent Setup</h1>
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Configure Your Agent</h5>
+                <p class="card-text">Set up and configure your AI agent here.</p>
+                
+                <form class="mt-4">
+                    <div class="mb-3">
+                        <label for="agentName" class="form-label">Agent Name</label>
+                        <input type="text" class="form-control" id="agentName" placeholder="Enter agent name">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="agentType" class="form-label">Agent Type</label>
+                        <select class="form-select" id="agentType">
+                            <option selected>Choose agent type...</option>
+                            <option value="assistant">Assistant</option>
+                            <option value="analyzer">Analyzer</option>
+                            <option value="automator">Automator</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="agentDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="agentDescription" rows="3" placeholder="Describe your agent's purpose"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="apiKey" class="form-label">API Key</label>
+                        <input type="password" class="form-control" id="apiKey" placeholder="Enter API key">
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="enableAgent">
+                        <label class="form-check-label" for="enableAgent">
+                            Enable Agent
+                        </label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Save Configuration</button>
+                    <button type="button" class="btn btn-secondary">Test Connection</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
