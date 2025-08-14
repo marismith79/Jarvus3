@@ -29,7 +29,7 @@ body {
 
 /* Main Content */
 .main-content {
-    padding: 2rem 0;
+    padding: 0;
     min-height: calc(100vh - 76px);
 }
 

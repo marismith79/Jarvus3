@@ -1,47 +1,1027 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Jarvus Demo{% endblock %}
+{% block title %}AI Agent Prior Authorization Dashboard - Jarvus Demo{% endblock %}
 
 {% block page_css %}
 <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <h1 class="mb-4">Dashboard</h1>
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Welcome to Jarvus Demo</h5>
-                <p class="card-text">This is the dashboard page. You can add your dashboard content here.</p>
-                <div class="row mt-4">
-                    <div class="col-md-4">
-                        <div class="card bg-primary text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Stats</h5>
-                                <p class="card-text">Add your statistics here</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card bg-success text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Recent Activity</h5>
-                                <p class="card-text">Add recent activity here</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card bg-info text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Quick Actions</h5>
-                                <p class="card-text">Add quick actions here</p>
-                            </div>
-                        </div>
-                    </div>
+<div class="work-queue-container">
+    <!-- Header Section -->
+    <div class="queue-header">
+        <div class="header-left">
+            <h1><i class="fas fa-robot"></i> AI Agent Prior Authorization Dashboard</h1>
+            <p class="subtitle">Automated prior authorization processing with human oversight</p>
+        </div>
+        <div class="header-right">
+            <div class="stats-summary">
+                <div class="stat-item">
+                    <span class="stat-number" id="total-count">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="automated-count">0</span>
+                    <span class="stat-label">Automated</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="human-review-count">0</span>
+                    <span class="stat-label">Human Review</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="completed-count">0</span>
+                    <span class="stat-label">Completed</span>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Automation Workflow Overview -->
+    <div class="workflow-overview">
+        <h2>Automation Workflow</h2>
+        <div class="workflow-steps">
+            <div class="workflow-step" data-step="1">
+                <div class="step-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div class="step-info">
+                    <h3>Coverage Determination</h3>
+                    <p>Check if CPT code is covered by insurance plan</p>
+                </div>
+                <div class="step-status" id="step-1-status">Optional</div>
+            </div>
+            <div class="workflow-step" data-step="2">
+                <div class="step-icon">
+                    <i class="fas fa-file-medical"></i>
+                </div>
+                <div class="step-info">
+                    <h3>Requirements Extraction</h3>
+                    <p>Extract clinical requirements and required documents</p>
+                </div>
+                <div class="step-status" id="step-2-status">Active</div>
+            </div>
+            <div class="workflow-step" data-step="3">
+                <div class="step-icon">
+                    <i class="fas fa-clipboard-check"></i>
+                </div>
+                <div class="step-info">
+                    <h3>Screening</h3>
+                    <p>Verify EHR data completeness and procedure appropriateness</p>
+                </div>
+                <div class="step-status" id="step-3-status">Pending</div>
+            </div>
+            <div class="workflow-step" data-step="4">
+                <div class="step-icon">
+                    <i class="fas fa-database"></i>
+                </div>
+                <div class="step-info">
+                    <h3>Data Extraction</h3>
+                    <p>Extract relevant data from EHR with citations</p>
+                </div>
+                <div class="step-status" id="step-4-status">Pending</div>
+            </div>
+            <div class="workflow-step" data-step="5">
+                <div class="step-icon">
+                    <i class="fas fa-paper-plane"></i>
+                </div>
+                <div class="step-info">
+                    <h3>Form Submission</h3>
+                    <p>Fill form and submit after human review</p>
+                </div>
+                <div class="step-status" id="step-5-status">Pending</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tab-navigation">
+        <button class="tab-button active" data-tab="all">
+            <i class="fas fa-list"></i>
+            All Requests
+            <span class="tab-count" id="all-count">0</span>
+        </button>
+        <button class="tab-button" data-tab="running">
+            <i class="fas fa-play-circle"></i>
+            In Progress
+            <span class="tab-count" id="running-tab-count">0</span>
+        </button>
+        <button class="tab-button" data-tab="review">
+            <i class="fas fa-eye"></i>
+            Human Review
+            <span class="tab-count" id="review-tab-count">0</span>
+        </button>
+        <button class="tab-button" data-tab="feedback">
+            <i class="fas fa-question-circle"></i>
+            Needs Input
+            <span class="tab-count" id="feedback-tab-count">0</span>
+        </button>
+        <button class="tab-button" data-tab="completed">
+            <i class="fas fa-check-circle"></i>
+            Completed
+            <span class="tab-count" id="completed-tab-count">0</span>
+        </button>
+    </div>
+
+    <!-- Filter and Search Bar -->
+    <div class="filter-bar">
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="search-input" placeholder="Search by patient name, MRN, or service type...">
+        </div>
+        <div class="filter-controls">
+            <select id="provider-filter">
+                <option value="">All Providers</option>
+                <option value="Medicare Part B">Medicare Part B</option>
+                <option value="Humana Medicare Advantage">Humana Medicare Advantage</option>
+                <option value="UnitedHealthcare Medicare Advantage">UnitedHealthcare Medicare Advantage</option>
+                <option value="Aetna Medicare Advantage">Aetna Medicare Advantage</option>
+                <option value="Kaiser Medicare Advantage">Kaiser Medicare Advantage</option>
+                <option value="Anthem Medicare Advantage">Anthem Medicare Advantage</option>
+                <option value="Cigna Medicare Advantage">Cigna Medicare Advantage</option>
+                <option value="Blue Cross Medicare Advantage">Blue Cross Medicare Advantage</option>
+            </select>
+            <select id="step-filter">
+                <option value="">All Steps</option>
+                <option value="1">Step 1: Coverage Determination</option>
+                <option value="2">Step 2: Requirements Extraction</option>
+                <option value="3">Step 3: Screening</option>
+                <option value="4">Step 4: Data Extraction</option>
+                <option value="5">Step 5: Form Submission</option>
+            </select>
+            <button class="refresh-btn" onclick="loadData()">
+                <i class="fas fa-sync-alt"></i>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Work Queue Table -->
+    <div class="queue-table-container">
+        <table class="queue-table" id="prior-auth-table">
+            <thead>
+                <tr>
+                    <th class="checkbox-col">
+                        <input type="checkbox" id="select-all">
+                    </th>
+                    <th class="patient-col sortable" data-sort="patient_name">
+                        Patient <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="service-col sortable" data-sort="service_type">
+                        Service Type <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="cpt-col sortable" data-sort="cpt_code">
+                        CPT Code <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="insurance-col sortable" data-sort="insurance_provider">
+                        Insurance <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="progress-col">Progress</th>
+                    <th class="current-step-col">Current Step</th>
+                    <th class="status-col sortable" data-sort="status">
+                        Status <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="dates-col sortable" data-sort="created_date">
+                        Created <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="due-col sortable" data-sort="due_date">
+                        Due <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="actions-col">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="prior-auth-tbody">
+                <!-- Data will be loaded dynamically -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Bulk Actions Bar -->
+    <div class="bulk-actions" id="bulk-actions" style="display: none;">
+        <div class="bulk-info">
+            <span id="selected-count">0</span> items selected
+        </div>
+        <div class="bulk-buttons">
+            <button class="btn btn-primary" onclick="startAutomation()">
+                <i class="fas fa-robot"></i>
+                Start Automation
+            </button>
+            <button class="btn btn-secondary" onclick="clearSelection()">
+                <i class="fas fa-times"></i>
+                Clear Selection
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div class="loading-spinner" id="loading-spinner" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading prior authorizations...</p>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" id="empty-state" style="display: none;">
+        <i class="fas fa-inbox"></i>
+        <h3>No Prior Authorizations Found</h3>
+        <p>There are no prior authorizations matching your current filters.</p>
+    </div>
 </div>
+
+<!-- Prior Auth Detail Modal -->
+<div class="modal" id="auth-detail-modal">
+    <div class="modal-content large-modal">
+        <div class="modal-header">
+            <h2>Prior Authorization Details</h2>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="modal-body">
+            <!-- Details will be loaded here -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+            <button class="btn btn-primary" id="modal-action-btn">Action</button>
+        </div>
+    </div>
+</div>
+
+<!-- Step Detail Modal -->
+<div class="modal" id="step-detail-modal">
+    <div class="modal-content large-modal">
+        <div class="modal-header">
+            <h2 id="step-modal-title">Step Details</h2>
+            <span class="close" onclick="closeStepModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="step-modal-body">
+            <!-- Step details will be loaded here -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeStepModal()">Close</button>
+            <button class="btn btn-primary" id="step-modal-action-btn">Action</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentTab = 'all';
+let allPriorAuths = [];
+let filteredPriorAuths = [];
+let currentSort = { field: 'created_date', direction: 'asc' };
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadData();
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // Tab navigation
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', function() {
+            const tab = this.dataset.tab;
+            switchTab(tab);
+        });
+    });
+
+    // Search and filters
+    document.getElementById('search-input').addEventListener('input', filterData);
+    document.getElementById('provider-filter').addEventListener('change', filterData);
+    document.getElementById('step-filter').addEventListener('change', filterData);
+
+    // Select all checkbox
+    document.getElementById('select-all').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.auth-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+        updateBulkActions();
+    });
+
+    // Sorting
+    document.querySelectorAll('.sortable').forEach(header => {
+        header.addEventListener('click', function() {
+            const field = this.dataset.sort;
+            sortData(field);
+        });
+    });
+}
+
+function switchTab(tab) {
+    currentTab = tab;
+    
+    // Update active tab button
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('active');
+    });
+    document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+    
+    // Load data for the selected tab
+    loadData();
+}
+
+async function loadData() {
+    showLoading(true);
+    
+    try {
+        const response = await fetch(`/api/prior-auths/${currentTab}`);
+        const data = await response.json();
+        
+        allPriorAuths = data;
+        filteredPriorAuths = data;
+        
+        renderTable();
+        updateStats();
+        showLoading(false);
+    } catch (error) {
+        console.error('Error loading data:', error);
+        showLoading(false);
+    }
+}
+
+async function updateStats() {
+    try {
+        const response = await fetch('/api/prior-auths/stats');
+        const stats = await response.json();
+        
+        document.getElementById('total-count').textContent = stats.total_count;
+        document.getElementById('automated-count').textContent = stats.status_counts.running || 0;
+        document.getElementById('human-review-count').textContent = (stats.status_counts.review || 0) + (stats.status_counts.feedback || 0);
+        document.getElementById('completed-count').textContent = stats.status_counts.completed || 0;
+        
+        // Update tab counts
+        document.getElementById('all-count').textContent = stats.status_counts.pending || 0;
+        document.getElementById('running-tab-count').textContent = stats.status_counts.running || 0;
+        document.getElementById('review-tab-count').textContent = stats.status_counts.review || 0;
+        document.getElementById('feedback-tab-count').textContent = stats.status_counts.feedback || 0;
+        document.getElementById('completed-tab-count').textContent = stats.status_counts.completed || 0;
+    } catch (error) {
+        console.error('Error updating stats:', error);
+    }
+}
+
+function renderTable() {
+    const tbody = document.getElementById('prior-auth-tbody');
+    tbody.innerHTML = '';
+    
+    if (filteredPriorAuths.length === 0) {
+        document.getElementById('empty-state').style.display = 'block';
+        document.getElementById('prior-auth-table').style.display = 'none';
+        return;
+    }
+    
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('prior-auth-table').style.display = 'table';
+    
+    filteredPriorAuths.forEach(auth => {
+        const row = createTableRow(auth);
+        tbody.appendChild(row);
+    });
+}
+
+function createTableRow(auth) {
+    const row = document.createElement('tr');
+    const currentStep = auth.current_step || 1;
+    const progress = (currentStep / 5) * 100;
+    
+    row.innerHTML = `
+        <td class="checkbox-col">
+            <input type="checkbox" class="auth-checkbox" value="${auth.id}" onchange="updateBulkActions()">
+        </td>
+        <td class="patient-col">
+            <div class="patient-info">
+                <div class="patient-name">${auth.patient_name}</div>
+                <div class="patient-mrn">MRN: ${auth.patient_mrn}</div>
+                <div class="clinical-urgency ${auth.clinical_urgency}">${auth.clinical_urgency}</div>
+            </div>
+        </td>
+        <td class="service-col">
+            <div class="service-info">
+                <div class="service-type">${auth.service_type}</div>
+                <div class="service-notes">${auth.notes}</div>
+            </div>
+        </td>
+        <td class="cpt-col">
+            <span class="cpt-code">${auth.cpt_code || 'N/A'}</span>
+        </td>
+        <td class="insurance-col">
+            <div class="insurance-info">
+                <div class="insurance-provider">${auth.insurance_provider}</div>
+                <div class="insurance-requirements">${auth.insurance_requirements}</div>
+            </div>
+        </td>
+        <td class="progress-col">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: ${progress}%"></div>
+            </div>
+            <div class="progress-text">${Math.round(progress)}%</div>
+        </td>
+        <td class="current-step-col">
+            <div class="step-indicator">
+                <span class="step-number">${currentStep}</span>
+                <span class="step-name">${getStepName(currentStep)}</span>
+            </div>
+        </td>
+        <td class="status-col">
+            <span class="status-badge status-${auth.status}">${getStatusDisplay(auth.status)}</span>
+        </td>
+        <td class="dates-col">
+            <div class="date-info">
+                <div class="created-date">${formatDate(auth.created_date)}</div>
+            </div>
+        </td>
+        <td class="due-col">
+            <div class="date-info">
+                <div class="due-date ${isOverdue(auth.due_date) ? 'overdue' : ''}">${formatDate(auth.due_date)}</div>
+            </div>
+        </td>
+        <td class="actions-col">
+            <div class="action-buttons">
+                <button class="btn btn-sm btn-outline" onclick="viewDetails(${auth.id})" title="View Details">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn btn-sm btn-outline" onclick="viewStepDetails(${auth.id})" title="View Step Details">
+                    <i class="fas fa-tasks"></i>
+                </button>
+                ${getActionButton(auth)}
+            </div>
+        </td>
+    `;
+    
+    return row;
+}
+
+function getStepName(step) {
+    const stepNames = {
+        1: 'Coverage',
+        2: 'Requirements',
+        3: 'Screening',
+        4: 'Data Extraction',
+        5: 'Submission'
+    };
+    return stepNames[step] || 'Unknown';
+}
+
+function getStatusDisplay(status) {
+    const statusMap = {
+        'pending': 'Pending',
+        'running': 'In Progress',
+        'review': 'Human Review',
+        'feedback': 'Needs Input',
+        'completed': 'Completed',
+        'failed': 'Failed'
+    };
+    return statusMap[status] || status;
+}
+
+function getActionButton(auth) {
+    if (auth.status === 'pending') {
+        return `<button class="btn btn-sm btn-primary" onclick="startAutomation(${auth.id})" title="Start Automation">
+                    <i class="fas fa-robot"></i>
+                </button>`;
+    } else if (auth.status === 'running') {
+        return `<button class="btn btn-sm btn-warning" onclick="pauseAutomation(${auth.id})" title="Pause Automation">
+                    <i class="fas fa-pause"></i>
+                </button>`;
+    } else if (auth.status === 'review') {
+        return `<button class="btn btn-sm btn-success" onclick="approveAuth(${auth.id})" title="Approve">
+                    <i class="fas fa-check"></i>
+                </button>`;
+    } else if (auth.status === 'feedback') {
+        return `<button class="btn btn-sm btn-info" onclick="provideFeedback(${auth.id})" title="Provide Feedback">
+                    <i class="fas fa-comment"></i>
+                </button>`;
+    }
+    return '';
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+}
+
+function isOverdue(dueDate) {
+    return new Date(dueDate) < new Date();
+}
+
+function filterData() {
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+    const providerFilter = document.getElementById('provider-filter').value;
+    const stepFilter = document.getElementById('step-filter').value;
+    
+    filteredPriorAuths = allPriorAuths.filter(auth => {
+        const matchesSearch = !searchTerm || 
+            auth.patient_name.toLowerCase().includes(searchTerm) ||
+            auth.patient_mrn.toLowerCase().includes(searchTerm) ||
+            auth.service_type.toLowerCase().includes(searchTerm) ||
+            (auth.cpt_code && auth.cpt_code.toLowerCase().includes(searchTerm));
+        
+        const matchesProvider = !providerFilter || auth.insurance_provider === providerFilter;
+        const matchesStep = !stepFilter || (auth.current_step || 1) == stepFilter;
+        
+        return matchesSearch && matchesProvider && matchesStep;
+    });
+    
+    // Apply current sorting
+    sortData(currentSort.field, currentSort.direction, false);
+}
+
+function sortData(field, direction = null, updateFiltered = true) {
+    // Update sort direction
+    if (direction === null) {
+        if (currentSort.field === field) {
+            currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSort.field = field;
+            currentSort.direction = 'asc';
+        }
+    } else {
+        currentSort.field = field;
+        currentSort.direction = direction;
+    }
+    
+    // Update sort indicators
+    document.querySelectorAll('.sortable i').forEach(icon => {
+        icon.className = 'fas fa-sort';
+    });
+    
+    const currentHeader = document.querySelector(`[data-sort="${currentSort.field}"]`);
+    if (currentHeader) {
+        const icon = currentHeader.querySelector('i');
+        icon.className = currentSort.direction === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+    }
+    
+    // Sort the data
+    const dataToSort = updateFiltered ? filteredPriorAuths : allPriorAuths;
+    
+    dataToSort.sort((a, b) => {
+        let aVal = a[currentSort.field];
+        let bVal = b[currentSort.field];
+        
+        // Handle date sorting
+        if (currentSort.field.includes('date')) {
+            aVal = new Date(aVal);
+            bVal = new Date(bVal);
+        } else if (typeof aVal === 'string') {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+        }
+        
+        if (aVal < bVal) return currentSort.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return currentSort.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    if (updateFiltered) {
+        renderTable();
+    }
+}
+
+function updateBulkActions() {
+    const checkboxes = document.querySelectorAll('.auth-checkbox:checked');
+    const bulkActions = document.getElementById('bulk-actions');
+    const selectedCount = document.getElementById('selected-count');
+    
+    if (checkboxes.length > 0) {
+        bulkActions.style.display = 'flex';
+        selectedCount.textContent = checkboxes.length;
+    } else {
+        bulkActions.style.display = 'none';
+    }
+}
+
+function clearSelection() {
+    document.querySelectorAll('.auth-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    document.getElementById('select-all').checked = false;
+    updateBulkActions();
+}
+
+async function startAutomation(authId = null) {
+    const selectedIds = authId ? [authId] : Array.from(document.querySelectorAll('.auth-checkbox:checked'))
+        .map(checkbox => checkbox.value);
+    
+    if (selectedIds.length === 0) return;
+    
+    if (confirm(`Start automation for ${selectedIds.length} prior authorization(s)?`)) {
+        for (const id of selectedIds) {
+            try {
+                const response = await fetch(`/api/prior-auths/${id}/start-automation`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    console.log(`Started automation for auth ${id}`);
+                }
+            } catch (error) {
+                console.error('Error starting automation:', error);
+            }
+        }
+        clearSelection();
+        loadData();
+    }
+}
+
+async function pauseAutomation(authId) {
+    if (confirm(`Pause automation for prior authorization ${authId}?`)) {
+        try {
+            const response = await fetch(`/api/prior-auths/${authId}/pause-automation`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.ok) {
+                console.log(`Paused automation for auth ${authId}`);
+                loadData();
+            } else {
+                console.error('Error pausing automation:', response.status);
+            }
+        } catch (error) {
+            console.error('Error pausing automation:', error);
+        }
+    }
+}
+
+async function approveAuth(authId) {
+    if (confirm(`Approve prior authorization ${authId}?`)) {
+        try {
+            const response = await fetch(`/api/prior-auths/${authId}/approve`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.ok) {
+                console.log(`Approved auth ${authId}`);
+                loadData();
+            } else {
+                console.error('Error approving auth:', response.status);
+            }
+        } catch (error) {
+            console.error('Error approving auth:', error);
+        }
+    }
+}
+
+async function provideFeedback(authId) {
+    const feedback = prompt('Enter feedback for prior authorization ' + authId + ':');
+    if (feedback) {
+        try {
+            const response = await fetch(`/api/prior-auths/${authId}/provide-feedback`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ feedback: feedback })
+            });
+            if (response.ok) {
+                console.log(`Provided feedback for auth ${authId}`);
+                loadData();
+            } else {
+                console.error('Error providing feedback:', response.status);
+            }
+        } catch (error) {
+            console.error('Error providing feedback:', error);
+        }
+    }
+}
+
+async function approveStep(authId) {
+    if (confirm(`Approve current step for prior authorization ${authId}?`)) {
+        try {
+            const response = await fetch(`/api/prior-auths/${authId}/approve-step`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.ok) {
+                console.log(`Approved step for auth ${authId}`);
+                loadData();
+            } else {
+                console.error('Error approving step:', response.status);
+            }
+        } catch (error) {
+            console.error('Error approving step:', error);
+        }
+    }
+}
+
+async function requestChanges(authId) {
+    const changes = prompt('Enter changes requested for prior authorization ' + authId + ':');
+    if (changes) {
+        try {
+            const response = await fetch(`/api/prior-auths/${authId}/request-changes`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ changes: changes })
+            });
+            if (response.ok) {
+                console.log(`Requested changes for auth ${authId}`);
+                loadData();
+            } else {
+                console.error('Error requesting changes:', response.status);
+            }
+        } catch (error) {
+            console.error('Error requesting changes:', error);
+        }
+    }
+}
+
+async function viewEHRData(authId) {
+    const auth = allPriorAuths.find(a => a.id == authId);
+    if (!auth) return;
+
+    const modalBody = document.getElementById('modal-body');
+    modalBody.innerHTML = `
+        <h3>EHR Data for Prior Authorization ${authId}</h3>
+        <div class="ehr-data-container">
+            <h4>Patient Information</h4>
+            <p><strong>Name:</strong> ${auth.patient_name}</p>
+            <p><strong>MRN:</strong> ${auth.patient_mrn}</p>
+            <p><strong>DOB:</strong> ${formatDate(auth.patient_dob)}</p>
+            <p><strong>Gender:</strong> ${auth.patient_gender}</p>
+            <p><strong>Insurance:</strong> ${auth.insurance_provider}</p>
+
+            <h4>Service Information</h4>
+            <p><strong>Service Type:</strong> ${auth.service_type}</p>
+            <p><strong>CPT Code:</strong> ${auth.cpt_code || 'N/A'}</p>
+            <p><strong>Procedure Date:</strong> ${formatDate(auth.procedure_date)}</p>
+            <p><strong>Notes:</strong> ${auth.notes}</p>
+
+            <h4>Clinical History</h4>
+            <p><strong>Diagnosis:</strong> ${auth.diagnosis || 'N/A'}</p>
+            <p><strong>Treatment History:</strong> ${auth.treatment_history || 'N/A'}</p>
+            <p><strong>Allergies:</strong> ${auth.allergies || 'N/A'}</p>
+
+            <h4>EHR Documents</h4>
+            <p>Documents linked to this authorization:</p>
+            <ul>
+                ${auth.ehr_documents ? auth.ehr_documents.map(doc => `<li>${doc.name} (Type: ${doc.type})</li>`).join('') : 'No documents linked.'}
+            </ul>
+        </div>
+    `;
+    document.getElementById('auth-detail-modal').style.display = 'block';
+}
+
+function viewDetails(authId) {
+    const auth = allPriorAuths.find(a => a.id == authId);
+    if (!auth) return;
+    
+    const modalBody = document.getElementById('modal-body');
+    modalBody.innerHTML = `
+        <div class="auth-details">
+            <div class="detail-section">
+                <h3>Patient Information</h3>
+                <p><strong>Name:</strong> ${auth.patient_name}</p>
+                <p><strong>MRN:</strong> ${auth.patient_mrn}</p>
+                <p><strong>Clinical Urgency:</strong> ${auth.clinical_urgency}</p>
+            </div>
+            <div class="detail-section">
+                <h3>Service Information</h3>
+                <p><strong>Service Type:</strong> ${auth.service_type}</p>
+                <p><strong>CPT Code:</strong> ${auth.cpt_code || 'N/A'}</p>
+                <p><strong>Notes:</strong> ${auth.notes}</p>
+            </div>
+            <div class="detail-section">
+                <h3>Insurance Information</h3>
+                <p><strong>Provider:</strong> ${auth.insurance_provider}</p>
+                <p><strong>Requirements:</strong> ${auth.insurance_requirements}</p>
+            </div>
+            <div class="detail-section">
+                <h3>Automation Status</h3>
+                <p><strong>Status:</strong> ${getStatusDisplay(auth.status)}</p>
+                <p><strong>Current Step:</strong> ${getStepName(auth.current_step || 1)}</p>
+                <p><strong>Progress:</strong> ${Math.round(((auth.current_step || 1) / 5) * 100)}%</p>
+                <p><strong>Created:</strong> ${formatDate(auth.created_date)}</p>
+                <p><strong>Due:</strong> ${formatDate(auth.due_date)}</p>
+                <p><strong>Last Updated:</strong> ${auth.last_updated}</p>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('auth-detail-modal').style.display = 'block';
+}
+
+function viewStepDetails(authId) {
+    const auth = allPriorAuths.find(a => a.id == authId);
+    if (!auth) return;
+    
+    const currentStep = auth.current_step || 1;
+    const stepTitle = document.getElementById('step-modal-title');
+    const stepBody = document.getElementById('step-modal-body');
+    
+    stepTitle.textContent = `Step ${currentStep}: ${getStepName(currentStep)}`;
+    
+    stepBody.innerHTML = `
+        <div class="step-details">
+            <div class="step-progress">
+                <h3>Automation Progress</h3>
+                <div class="step-timeline">
+                    ${generateStepTimeline(auth)}
+                </div>
+            </div>
+            <div class="step-content">
+                <h3>Current Step Details</h3>
+                ${generateStepContent(auth, currentStep)}
+            </div>
+            <div class="step-actions">
+                <h3>Available Actions</h3>
+                ${generateStepActions(auth, currentStep)}
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('step-detail-modal').style.display = 'block';
+}
+
+function generateStepTimeline(auth) {
+    const steps = [
+        { name: 'Coverage Determination', icon: 'fas fa-search' },
+        { name: 'Requirements Extraction', icon: 'fas fa-file-medical' },
+        { name: 'Screening', icon: 'fas fa-clipboard-check' },
+        { name: 'Data Extraction', icon: 'fas fa-database' },
+        { name: 'Form Submission', icon: 'fas fa-paper-plane' }
+    ];
+    
+    const currentStep = auth.current_step || 1;
+    
+    return steps.map((step, index) => {
+        const stepNum = index + 1;
+        const status = stepNum < currentStep ? 'completed' : 
+                      stepNum === currentStep ? 'current' : 'pending';
+        
+        return `
+            <div class="timeline-step ${status}">
+                <div class="timeline-icon">
+                    <i class="${step.icon}"></i>
+                </div>
+                <div class="timeline-content">
+                    <h4>Step ${stepNum}: ${step.name}</h4>
+                    <p>${getStepStatusText(stepNum, currentStep, auth.status)}</p>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getStepStatusText(stepNum, currentStep, status) {
+    if (stepNum < currentStep) {
+        return 'Completed successfully';
+    } else if (stepNum === currentStep) {
+        if (status === 'running') {
+            return 'Currently being processed by AI agent';
+        } else if (status === 'review') {
+            return 'Awaiting human review';
+        } else if (status === 'feedback') {
+            return 'Requires additional input';
+        } else {
+            return 'Pending';
+        }
+    } else {
+        return 'Not started';
+    }
+}
+
+function generateStepContent(auth, currentStep) {
+    const stepContents = {
+        1: `
+            <div class="step-content-item">
+                <h4>Coverage Determination</h4>
+                <p>Checking if CPT code ${auth.cpt_code} is covered by ${auth.insurance_provider}.</p>
+                <div class="coverage-result">
+                    <strong>Result:</strong> <span class="status-badge status-pending">In Progress</span>
+                </div>
+            </div>
+        `,
+        2: `
+            <div class="step-content-item">
+                <h4>Requirements Extraction</h4>
+                <p>Extracting clinical requirements and required documents for ${auth.service_type}.</p>
+                <div class="requirements-list">
+                    <strong>Identified Requirements:</strong>
+                    <ul>
+                        <li>Clinical documentation supporting medical necessity</li>
+                        <li>Provider credentials and specialty</li>
+                        <li>Patient diagnosis and history</li>
+                        <li>Prior treatment records</li>
+                    </ul>
+                </div>
+            </div>
+        `,
+        3: `
+            <div class="step-content-item">
+                <h4>Screening</h4>
+                <p>Verifying EHR data completeness and procedure appropriateness.</p>
+                <div class="screening-results">
+                    <strong>Screening Results:</strong>
+                    <ul>
+                        <li>✅ Patient demographics complete</li>
+                        <li>✅ Insurance information verified</li>
+                        <li>⚠️ Missing: Recent lab results</li>
+                        <li>✅ Procedure appropriateness confirmed</li>
+                    </ul>
+                </div>
+            </div>
+        `,
+        4: `
+            <div class="step-content-item">
+                <h4>Data Extraction</h4>
+                <p>Extracting relevant data from EHR with citations.</p>
+                <div class="extraction-results">
+                    <strong>Extracted Data:</strong>
+                    <div class="data-item">
+                        <span class="data-label">Diagnosis:</span>
+                        <span class="data-value">Metastatic lung cancer (ICD-10: C78.00)</span>
+                        <span class="data-source">Source: Progress Note 2024-01-15</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Treatment History:</span>
+                        <span class="data-value">Previous chemotherapy cycles documented</span>
+                        <span class="data-source">Source: Treatment Plan 2024-01-10</span>
+                    </div>
+                </div>
+            </div>
+        `,
+        5: `
+            <div class="step-content-item">
+                <h4>Form Submission</h4>
+                <p>Preparing form for submission after human review.</p>
+                <div class="form-status">
+                    <strong>Form Status:</strong> <span class="status-badge status-pending">Ready for Review</span>
+                    <div class="form-preview">
+                        <p>Form has been populated with extracted data and is ready for human verification before submission.</p>
+                    </div>
+                </div>
+            </div>
+        `
+    };
+    
+    return stepContents[currentStep] || '<p>Step details not available.</p>';
+}
+
+function generateStepActions(auth, currentStep) {
+    const actions = [];
+    
+    if (auth.status === 'running') {
+        actions.push(`
+            <button class="btn btn-warning" onclick="pauseAutomation(${auth.id})">
+                <i class="fas fa-pause"></i> Pause Automation
+            </button>
+        `);
+    } else if (auth.status === 'review') {
+        actions.push(`
+            <button class="btn btn-success" onclick="approveStep(${auth.id})">
+                <i class="fas fa-check"></i> Approve & Continue
+            </button>
+            <button class="btn btn-warning" onclick="requestChanges(${auth.id})">
+                <i class="fas fa-edit"></i> Request Changes
+            </button>
+        `);
+    } else if (auth.status === 'feedback') {
+        actions.push(`
+            <button class="btn btn-info" onclick="provideFeedback(${auth.id})">
+                <i class="fas fa-comment"></i> Provide Feedback
+            </button>
+        `);
+    }
+    
+    actions.push(`
+        <button class="btn btn-secondary" onclick="viewEHRData(${auth.id})">
+            <i class="fas fa-database"></i> View EHR Data
+        </button>
+    `);
+    
+    return actions.join('');
+}
+
+function closeModal() {
+    document.getElementById('auth-detail-modal').style.display = 'none';
+}
+
+function closeStepModal() {
+    document.getElementById('step-detail-modal').style.display = 'none';
+}
+
+function showLoading(show) {
+    document.getElementById('loading-spinner').style.display = show ? 'flex' : 'none';
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    const authModal = document.getElementById('auth-detail-modal');
+    const stepModal = document.getElementById('step-detail-modal');
+    
+    if (event.target === authModal) {
+        closeModal();
+    }
+    if (event.target === stepModal) {
+        closeStepModal();
+    }
+}
+</script>
 {% endblock %}
