@@ -7,52 +7,373 @@
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <h1 class="mb-4">Agent Setup</h1>
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Configure Your Agent</h5>
-                <p class="card-text">Set up and configure your AI agent here.</p>
-                
-                <form class="mt-4">
-                    <div class="mb-3">
-                        <label for="agentName" class="form-label">Agent Name</label>
-                        <input type="text" class="form-control" id="agentName" placeholder="Enter agent name">
+<div class="workflow-layout">
+    <div class="workflow-sidebar">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <h5 class="mb-0">Workflows</h5>
+            <button id="newWorkflowBtn" class="btn btn-sm btn-primary">New</button>
+        </div>
+        <div id="workflowList" class="list-group workflow-list" role="tablist"></div>
+    </div>
+
+    <div class="workflow-content">
+        <div id="placeholderPanel" class="text-muted">
+            <h5 class="mb-2">Workflow Creator</h5>
+            <p>Select a workflow from the left to view details, or click "New" to create one.</p>
+        </div>
+
+        <div id="viewPanel" class="d-none">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="mb-0">Workflow Details</h5>
+                <div>
+                    <button id="editBtn" class="btn btn-sm btn-secondary">Edit</button>
+                    <div id="editActions" class="d-inline d-none">
+                        <button id="saveBtn" class="btn btn-sm btn-primary">Save</button>
+                        <button id="cancelBtn" class="btn btn-sm btn-outline-secondary" type="button">Cancel</button>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="agentType" class="form-label">Agent Type</label>
-                        <select class="form-select" id="agentType">
-                            <option selected>Choose agent type...</option>
-                            <option value="assistant">Assistant</option>
-                            <option value="analyzer">Analyzer</option>
-                            <option value="automator">Automator</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="agentDescription" class="form-label">Description</label>
-                        <textarea class="form-control" id="agentDescription" rows="3" placeholder="Describe your agent's purpose"></textarea>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="apiKey" class="form-label">API Key</label>
-                        <input type="password" class="form-control" id="apiKey" placeholder="Enter API key">
-                    </div>
-                    
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="enableAgent">
-                        <label class="form-check-label" for="enableAgent">
-                            Enable Agent
-                        </label>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary">Save Configuration</button>
-                    <button type="button" class="btn btn-secondary">Test Connection</button>
-                </form>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Name</label>
+                <input id="viewName" type="text" class="form-control" disabled>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea id="viewDescription" class="form-control" rows="5" disabled></textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">CPT Code</label>
+                <input id="viewCpt" type="text" class="form-control" placeholder="e.g., 99213" disabled>
+            </div>
+            <div class="mb-2">
+                <label class="form-label">Payer Nuances</label>
+                <div id="viewNuances" class="mb-2"></div>
+                <div id="editNuances" class="d-none"></div>
+                <button id="addNuanceBtn" class="btn btn-sm btn-outline-primary d-none" type="button">Add +</button>
+            </div>
+        </div>
+
+        <div id="createPanel" class="d-none">
+            <h5 class="mb-3">Create New Workflow</h5>
+            <div class="mb-3">
+                <label for="createName" class="form-label">Name</label>
+                <input id="createName" type="text" class="form-control" placeholder="Enter workflow name">
+                <div id="nameError" class="invalid-feedback"></div>
+            </div>
+            <div class="mb-3">
+                <label for="createDescription" class="form-label">Description</label>
+                <textarea id="createDescription" class="form-control" rows="5" placeholder="Describe this workflow"></textarea>
+            </div>
+            <div class="mb-3">
+                <label for="createCpt" class="form-label">CPT Code</label>
+                <input id="createCpt" type="text" class="form-control" placeholder="e.g., 99213">
+            </div>
+            <div class="mb-2">
+                <label class="form-label">Payer Nuances</label>
+                <div id="createNuances"></div>
+                <button id="createAddNuanceBtn" class="btn btn-sm btn-outline-primary" type="button">Add +</button>
+            </div>
+            <div class="setup-buttons">
+                <button id="createSubmit" class="btn btn-primary">Create</button>
+                <button id="createCancel" class="btn btn-secondary" type="button">Cancel</button>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        const listEl = document.getElementById('workflowList');
+        const newBtn = document.getElementById('newWorkflowBtn');
+        const placeholder = document.getElementById('placeholderPanel');
+        const viewPanel = document.getElementById('viewPanel');
+        const createPanel = document.getElementById('createPanel');
+
+        const viewName = document.getElementById('viewName');
+        const viewDescription = document.getElementById('viewDescription');
+        const viewCpt = document.getElementById('viewCpt');
+        const viewNuances = document.getElementById('viewNuances');
+        const editNuances = document.getElementById('editNuances');
+        const addNuanceBtn = document.getElementById('addNuanceBtn');
+        const editBtn = document.getElementById('editBtn');
+        const editActions = document.getElementById('editActions');
+        const saveBtn = document.getElementById('saveBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+
+        const createName = document.getElementById('createName');
+        const createDescription = document.getElementById('createDescription');
+        const createCpt = document.getElementById('createCpt');
+        const createNuances = document.getElementById('createNuances');
+        const createAddNuanceBtn = document.getElementById('createAddNuanceBtn');
+        const nameError = document.getElementById('nameError');
+        const createSubmit = document.getElementById('createSubmit');
+        const createCancel = document.getElementById('createCancel');
+
+        const PAYERS = [
+            'UnitedHealthcare','Anthem Blue Cross Blue Shield','Aetna','Cigna','Humana','Kaiser Permanente','Blue Cross Blue Shield of Michigan','Blue Shield of California','Highmark','Blue Cross Blue Shield of Florida (Florida Blue)','Molina Healthcare','Centene','WellCare','CareSource','Independence Blue Cross','EmblemHealth','Health Care Service Corporation','Oscar Health','Tufts Health Plan','Premera Blue Cross'
+        ];
+
+        let currentWorkflowId = null;
+        let isEditing = false;
+
+        function showPanel(panel) {
+            placeholder.classList.add('d-none');
+            viewPanel.classList.add('d-none');
+            createPanel.classList.add('d-none');
+            panel.classList.remove('d-none');
+        }
+
+        function selectListItem(activeId) {
+            const items = listEl.querySelectorAll('.list-group-item');
+            items.forEach((el) => {
+                if (Number(el.dataset.id) === Number(activeId)) {
+                    el.classList.add('active');
+                } else {
+                    el.classList.remove('active');
+                }
+            });
+        }
+
+        async function loadWorkflows() {
+            const res = await fetch('/api/workflows');
+            const data = await res.json();
+            listEl.innerHTML = '';
+            data.forEach((wf) => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'list-group-item list-group-item-action';
+                item.dataset.id = wf.id;
+                item.innerHTML = `<div class="d-flex w-100 justify-content-between"><strong>${wf.name}</strong></div><small class="text-muted text-truncate">${wf.description || ''}</small>`;
+                item.addEventListener('click', () => {
+                    showWorkflow(wf.id);
+                });
+                listEl.appendChild(item);
+            });
+        }
+
+        async function showWorkflow(id) {
+            try {
+                const res = await fetch(`/api/workflows/${id}`);
+                if (!res.ok) throw new Error('Not found');
+                const wf = await res.json();
+                viewName.value = wf.name || '';
+                viewDescription.value = wf.description || '';
+                viewCpt.value = wf.cpt_code || '';
+                renderNuancesView(wf.payer_nuances || []);
+                showPanel(viewPanel);
+                selectListItem(id);
+                currentWorkflowId = id;
+                exitEditMode();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function startCreate() {
+            createName.classList.remove('is-invalid');
+            nameError.textContent = '';
+            createName.value = '';
+            createDescription.value = '';
+            createCpt.value = '';
+            createNuances.innerHTML = '';
+            selectListItem(null);
+            showPanel(createPanel);
+        }
+
+        async function submitCreate() {
+            const name = createName.value.trim();
+            const description = createDescription.value.trim();
+            const cpt_code = createCpt.value.trim();
+            const payer_nuances = readNuanceRows(createNuances);
+            if (!name) {
+                createName.classList.add('is-invalid');
+                nameError.textContent = 'Name is required.';
+                return;
+            }
+            createSubmit.disabled = true;
+            createSubmit.classList.add('btn-loading');
+            try {
+                const res = await fetch('/api/workflows', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, description, cpt_code, payer_nuances })
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || 'Failed to create');
+                }
+                const created = await res.json();
+                await loadWorkflows();
+                await showWorkflow(created.id);
+            } catch (e) {
+                console.error(e);
+                createName.classList.add('is-invalid');
+                nameError.textContent = e.message || 'Failed to create workflow';
+            } finally {
+                createSubmit.disabled = false;
+                createSubmit.classList.remove('btn-loading');
+            }
+        }
+
+        function renderNuancesView(nuances) {
+            if (!Array.isArray(nuances) || nuances.length === 0) {
+                viewNuances.innerHTML = '<div class="text-muted">No payer nuances</div>';
+                return;
+            }
+            viewNuances.innerHTML = '';
+            const list = document.createElement('div');
+            nuances.forEach(n => {
+                const item = document.createElement('div');
+                item.className = 'mb-2';
+                const planLabel = n.plan_type === 'medicare_advantage' ? 'Medicare Advantage' : 'Commercial';
+                item.innerHTML = `<span class="badge bg-secondary me-2">${n.payer}</span><span class="badge bg-info text-dark me-2">${planLabel}</span><span class="text-muted">${n.description || ''}</span>`;
+                list.appendChild(item);
+            });
+            viewNuances.appendChild(list);
+        }
+
+        function createNuanceRow(initial = {}) {
+            const row = document.createElement('div');
+            row.className = 'payer-row row g-2 align-items-center mb-2';
+
+            const colPayer = document.createElement('div');
+            colPayer.className = 'col-md-4';
+            const payerSelect = document.createElement('select');
+            payerSelect.className = 'form-select';
+            PAYERS.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p; opt.textContent = p; payerSelect.appendChild(opt);
+            });
+            if (initial.payer) payerSelect.value = initial.payer;
+            colPayer.appendChild(payerSelect);
+
+            const colPlan = document.createElement('div');
+            colPlan.className = 'col-md-3';
+            const planSelect = document.createElement('select');
+            planSelect.className = 'form-select';
+            planSelect.innerHTML = '<option value="medicare_advantage">Medicare Advantage</option><option value="commercial">Commercial</option>';
+            if (initial.plan_type) planSelect.value = initial.plan_type;
+            colPlan.appendChild(planSelect);
+
+            const colDesc = document.createElement('div');
+            colDesc.className = 'col-md-4';
+            const descInput = document.createElement('input');
+            descInput.type = 'text'; descInput.className = 'form-control';
+            descInput.placeholder = 'Nuance description';
+            if (initial.description) descInput.value = initial.description;
+            colDesc.appendChild(descInput);
+
+            const colRemove = document.createElement('div');
+            colRemove.className = 'col-md-1 d-grid';
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button'; removeBtn.className = 'btn btn-outline-danger btn-sm';
+            removeBtn.textContent = 'X';
+            removeBtn.addEventListener('click', () => row.remove());
+            colRemove.appendChild(removeBtn);
+
+            row.appendChild(colPayer);
+            row.appendChild(colPlan);
+            row.appendChild(colDesc);
+            row.appendChild(colRemove);
+
+            return row;
+        }
+
+        function readNuanceRows(container) {
+            const rows = Array.from(container.querySelectorAll('.payer-row'));
+            return rows.map(r => {
+                const [payerSelect, planSelect, descInput] = r.querySelectorAll('select, input');
+                return {
+                    payer: payerSelect.value,
+                    plan_type: planSelect.value,
+                    description: descInput.value.trim(),
+                };
+            }).filter(n => n.payer && n.plan_type);
+        }
+
+        function enterEditMode() {
+            isEditing = true;
+            editBtn.classList.add('d-none');
+            editActions.classList.remove('d-none');
+            addNuanceBtn.classList.remove('d-none');
+            viewName.disabled = false;
+            viewDescription.disabled = false;
+            viewCpt.disabled = false;
+            viewNuances.classList.add('d-none');
+            editNuances.classList.remove('d-none');
+            // seed edit nuances with current view
+            editNuances.innerHTML = '';
+            const current = Array.from(viewNuances.querySelectorAll('.mb-2')).map(el => {
+                const spans = el.querySelectorAll('span');
+                return {
+                    payer: spans[0]?.textContent || '',
+                    plan_type: (spans[1]?.textContent || '').toLowerCase().includes('medicare') ? 'medicare_advantage' : 'commercial',
+                    description: (spans[2]?.textContent || '').trim(),
+                };
+            });
+            if (current.length === 0) {
+                editNuances.appendChild(createNuanceRow());
+            } else {
+                current.forEach(n => editNuances.appendChild(createNuanceRow(n)));
+            }
+        }
+
+        async function saveEdits() {
+            if (!currentWorkflowId) return;
+            const name = viewName.value.trim();
+            const description = viewDescription.value.trim();
+            const cpt_code = viewCpt.value.trim();
+            const payer_nuances = readNuanceRows(editNuances);
+            if (!name) return;
+            saveBtn.disabled = true; saveBtn.classList.add('btn-loading');
+            try {
+                const res = await fetch(`/api/workflows/${currentWorkflowId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, description, cpt_code, payer_nuances })
+                });
+                if (!res.ok) throw new Error('Failed to save');
+                await loadWorkflows();
+                await showWorkflow(currentWorkflowId);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                saveBtn.disabled = false; saveBtn.classList.remove('btn-loading');
+            }
+        }
+
+        function exitEditMode() {
+            isEditing = false;
+            editBtn.classList.remove('d-none');
+            editActions.classList.add('d-none');
+            addNuanceBtn.classList.add('d-none');
+            viewName.disabled = true;
+            viewDescription.disabled = true;
+            viewCpt.disabled = true;
+            viewNuances.classList.remove('d-none');
+            editNuances.classList.add('d-none');
+        }
+
+        // Events for nuances
+        addNuanceBtn.addEventListener('click', () => {
+            editNuances.appendChild(createNuanceRow());
+        });
+        createAddNuanceBtn.addEventListener('click', () => {
+            createNuances.appendChild(createNuanceRow());
+        });
+
+        // Edit events
+        editBtn.addEventListener('click', enterEditMode);
+        saveBtn.addEventListener('click', saveEdits);
+        cancelBtn.addEventListener('click', async () => {
+            if (currentWorkflowId) await showWorkflow(currentWorkflowId);
+        });
+
+        newBtn.addEventListener('click', startCreate);
+        createSubmit.addEventListener('click', submitCreate);
+        createCancel.addEventListener('click', () => showPanel(placeholder));
+
+        loadWorkflows();
+    })();
+</script>
 {% endblock %}
