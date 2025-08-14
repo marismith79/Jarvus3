@@ -1,0 +1,294 @@
+/* Settings Page Specific Styles */
+
+/* Settings Header */
+.settings-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.settings-header h1 {
+    color: white;
+    margin: 0;
+    font-size: 2.5rem;
+    font-weight: 700;
+}
+
+/* Settings Grid */
+.settings-grid {
+    display: grid;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+/* Settings Cards */
+.settings-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.settings-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.settings-card .card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid #dee2e6;
+    padding: 1.5rem;
+}
+
+.settings-card .card-header h5 {
+    color: #2c3e50;
+    font-weight: 600;
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.settings-card .card-body {
+    padding: 2rem;
+}
+
+/* Form Groups in Settings */
+.settings-form-group {
+    margin-bottom: 1.5rem;
+}
+
+.settings-form-label {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+    display: block;
+}
+
+.settings-form-control, .settings-form-select {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background-color: #f8f9fa;
+    width: 100%;
+}
+
+.settings-form-control:focus, .settings-form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    background-color: white;
+}
+
+/* Checkbox Groups */
+.checkbox-group {
+    margin-bottom: 1.5rem;
+}
+
+.settings-checkbox {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    transition: background-color 0.3s ease;
+}
+
+.settings-checkbox:hover {
+    background-color: #e9ecef;
+}
+
+.settings-checkbox input[type="checkbox"] {
+    width: 1.2rem;
+    height: 1.2rem;
+    margin-right: 0.75rem;
+    border: 2px solid #ced4da;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.settings-checkbox input[type="checkbox"]:checked {
+    background-color: #667eea;
+    border-color: #667eea;
+}
+
+.settings-checkbox input[type="checkbox"]:focus {
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.settings-checkbox label {
+    font-weight: 500;
+    color: #2c3e50;
+    cursor: pointer;
+    margin: 0;
+    flex: 1;
+}
+
+/* Settings Buttons */
+.settings-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-save {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    font-size: 1rem;
+    color: white;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-save:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    color: white;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #ff8c00 100%);
+    border: none;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    font-size: 1rem;
+    color: white;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, #ff8c00 0%, #ffc107 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+    color: white;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    border: none;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    font-size: 1rem;
+    color: white;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #c82333 0%, #dc3545 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+    color: white;
+}
+
+/* Advanced Settings Section */
+.advanced-settings {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+    margin-top: 2rem;
+}
+
+.advanced-settings .card-header {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    color: white;
+    border-bottom: 1px solid #dee2e6;
+    padding: 1.5rem;
+}
+
+.advanced-settings .card-header h5 {
+    color: white;
+    font-weight: 600;
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.advanced-settings .card-body {
+    padding: 2rem;
+}
+
+/* Settings Grid Layout */
+.settings-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .settings-header h1 {
+        font-size: 2rem;
+    }
+    
+    .settings-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .settings-card .card-body {
+        padding: 1.5rem;
+    }
+    
+    .settings-buttons {
+        flex-direction: column;
+    }
+    
+    .btn-save, .btn-warning, .btn-danger {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .settings-row {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .settings-card .card-body {
+        padding: 1rem;
+    }
+    
+    .settings-form-control, .settings-form-select {
+        padding: 0.6rem 0.8rem;
+    }
+    
+    .settings-checkbox {
+        padding: 0.5rem;
+    }
+}
+
+/* Settings Animation */
+.settings-card {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Settings Card Delay Animation */
+.settings-card:nth-child(1) { animation-delay: 0.1s; }
+.settings-card:nth-child(2) { animation-delay: 0.2s; }
+.settings-card:nth-child(3) { animation-delay: 0.3s; }
+.settings-card:nth-child(4) { animation-delay: 0.4s; }
