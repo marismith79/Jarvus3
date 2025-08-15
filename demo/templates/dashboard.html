@@ -32,7 +32,7 @@
                     <span class="stat-number" id="completed-count">0</span>
                     <span class="stat-label">Completed</span>
                 </div>
-            </div>
+                </div>
         </div>
     </div>
 
@@ -48,7 +48,7 @@
                     <h3>Coverage Determination</h3>
                     <p>Check if CPT code is covered by insurance plan</p>
                 </div>
-                <div class="step-status" id="step-1-status">Optional</div>
+                <!-- <div class="step-status" id="step-1-status">Optional</div> -->
             </div>
             <div class="workflow-step" data-step="2">
                 <div class="step-icon">
@@ -58,7 +58,7 @@
                     <h3>Requirements Extraction</h3>
                     <p>Extract clinical requirements and required documents</p>
                 </div>
-                <div class="step-status" id="step-2-status">Active</div>
+                <!-- <div class="step-status" id="step-2-status">Active</div> -->
             </div>
             <div class="workflow-step" data-step="3">
                 <div class="step-icon">
@@ -68,7 +68,7 @@
                     <h3>Screening</h3>
                     <p>Verify EHR data completeness and procedure appropriateness</p>
                 </div>
-                <div class="step-status" id="step-3-status">Pending</div>
+                <!-- <div class="step-status" id="step-3-status">Pending</div> -->
             </div>
             <div class="workflow-step" data-step="4">
                 <div class="step-icon">
@@ -78,7 +78,7 @@
                     <h3>Data Extraction</h3>
                     <p>Extract relevant data from EHR with citations</p>
                 </div>
-                <div class="step-status" id="step-4-status">Pending</div>
+                <!-- <div class="step-status" id="step-4-status">Pending</div> -->
             </div>
             <div class="workflow-step" data-step="5">
                 <div class="step-icon">
@@ -88,7 +88,7 @@
                     <h3>Form Submission</h3>
                     <p>Fill form and submit after human review</p>
                 </div>
-                <div class="step-status" id="step-5-status">Pending</div>
+                <!-- <div class="step-status" id="step-5-status">Pending</div> -->
             </div>
         </div>
     </div>
@@ -209,6 +209,10 @@
                 <i class="fas fa-times"></i>
                 Clear Selection
             </button>
+            <button class="btn btn-warning" onclick="debugData()" style="margin-left: 10px;">
+                <i class="fas fa-bug"></i>
+                Debug Data
+            </button>
         </div>
     </div>
 
@@ -260,14 +264,141 @@
     </div>
 </div>
 
+<!-- Automation Workflow Popup -->
+<div class="modal" id="automation-popup">
+    <div class="modal-content automation-modal">
+        <div class="modal-header">
+            <h2><i class="fas fa-robot"></i> AI Agent Automation in Progress</h2>
+            <span class="close" onclick="closeAutomationPopup()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="automation-container">
+                <!-- Progress Bar -->
+                <div class="automation-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="automation-progress-fill"></div>
+                    </div>
+                    <div class="progress-text" id="automation-progress-text">0% Complete</div>
+                </div>
+
+                <!-- Current Step Display -->
+                <div class="current-step-display">
+                    <div class="step-header">
+                        <div class="step-icon" id="current-step-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <div class="step-info">
+                            <h3 id="current-step-title">Step 1: Coverage Determination</h3>
+                            <p id="current-step-description">Checking if CPT code is covered by insurance plan...</p>
+                        </div>
+                        <div class="step-status" id="current-step-status">
+                            <i class="fas fa-spinner fa-spin"></i> Running
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step Content Area -->
+                <div class="step-content-area">
+                    <div class="content-container" id="step-content-container">
+                        <!-- Content will be dynamically populated -->
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="automation-actions" id="automation-actions" style="display: none;">
+                    <button class="btn btn-success" onclick="approveCurrentStep()">
+                        <i class="fas fa-check"></i> Approve & Continue
+                    </button>
+                    <button class="btn btn-warning" onclick="requestChanges()">
+                        <i class="fas fa-edit"></i> Request Changes
+                    </button>
+                    <button class="btn btn-info" onclick="sendToClinician()">
+                        <i class="fas fa-user-md"></i> Send to Clinician
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Clinician Message Modal -->
+<div class="modal" id="clinician-message-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Message to Clinician</h2>
+            <span class="close" onclick="closeClinicianModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="message-preview">
+                <h4>Subject: Prior Authorization - Missing Information</h4>
+                <div class="message-content" id="clinician-message-content">
+                    <!-- Message content will be populated -->
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeClinicianModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="sendClinicianMessage()">
+                <i class="fas fa-paper-plane"></i> Send via EPIC
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 let currentTab = 'all';
 let allPriorAuths = [];
 let filteredPriorAuths = [];
 let currentSort = { field: 'created_date', direction: 'asc' };
 
+// Automation workflow variables
+let currentAutomationStep = 1;
+let automationData = {};
+let streamingInterval = null;
+let stepResults = {};
+
+// Step configurations
+const automationSteps = [
+    {
+        id: 1,
+        title: "Coverage Determination",
+        description: "Checking if CPT code is covered by insurance plan",
+        icon: "fas fa-search",
+        content: "coverage"
+    },
+    {
+        id: 2,
+        title: "Insurance Documentation",
+        description: "Searching for insurance requirements and documentation",
+        icon: "fas fa-file-medical",
+        content: "insurance"
+    },
+    {
+        id: 3,
+        title: "Screening",
+        description: "Analyzing request notes and EHR data for completeness",
+        icon: "fas fa-clipboard-check",
+        content: "screening"
+    },
+    {
+        id: 4,
+        title: "Data Extraction",
+        description: "Extracting relevant data from EHR with citations",
+        icon: "fas fa-database",
+        content: "extraction"
+    },
+    {
+        id: 5,
+        title: "Form Completion",
+        description: "Filling out Medicaid Husky form for genetic testing",
+        icon: "fas fa-paper-plane",
+        content: "form"
+    }
+];
+
 // Load data on page load
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, calling loadData...');
     loadData();
     setupEventListeners();
 });
@@ -318,20 +449,35 @@ function switchTab(tab) {
 }
 
 async function loadData() {
+    console.log('=== loadData called ===');
     showLoading(true);
     
     try {
-        const response = await fetch(`/api/prior-auths/${currentTab}`);
+        console.log('Loading data for tab:', currentTab);
+        const url = `/api/prior-auths/${currentTab}`;
+        console.log('Fetching from URL:', url);
+        
+        const response = await fetch(url);
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+        
         const data = await response.json();
+        console.log('Received data:', data);
+        console.log('Data length:', data.length);
+        console.log('Data type:', typeof data);
         
         allPriorAuths = data;
         filteredPriorAuths = data;
         
+        console.log('About to call renderTable...');
         renderTable();
+        console.log('About to call updateStats...');
         updateStats();
         showLoading(false);
+        console.log('=== loadData completed ===');
     } catch (error) {
         console.error('Error loading data:', error);
+        console.error('Error details:', error.message);
         showLoading(false);
     }
 }
@@ -357,23 +503,52 @@ async function updateStats() {
     }
 }
 
+function showLoading(show) {
+    const spinner = document.getElementById('loading-spinner');
+    const table = document.getElementById('prior-auth-table');
+    
+    if (show) {
+        spinner.style.display = 'flex';
+        if (table) table.style.display = 'none';
+    } else {
+        spinner.style.display = 'none';
+        if (table) table.style.display = 'table';
+    }
+}
+
 function renderTable() {
+    console.log('=== renderTable called ===');
+    console.log('filteredPriorAuths:', filteredPriorAuths);
+    console.log('filteredPriorAuths.length:', filteredPriorAuths.length);
+    
     const tbody = document.getElementById('prior-auth-tbody');
+    console.log('tbody element:', tbody);
+    
+    if (!tbody) {
+        console.error('Could not find tbody element!');
+        return;
+    }
+    
     tbody.innerHTML = '';
     
     if (filteredPriorAuths.length === 0) {
+        console.log('No data to display, showing empty state');
         document.getElementById('empty-state').style.display = 'block';
         document.getElementById('prior-auth-table').style.display = 'none';
         return;
     }
     
+    console.log('Showing table with data');
     document.getElementById('empty-state').style.display = 'none';
     document.getElementById('prior-auth-table').style.display = 'table';
     
-    filteredPriorAuths.forEach(auth => {
+    filteredPriorAuths.forEach((auth, index) => {
+        console.log(`Creating row ${index + 1} for auth:`, auth);
         const row = createTableRow(auth);
         tbody.appendChild(row);
     });
+    
+    console.log('=== renderTable completed ===');
 }
 
 function createTableRow(auth) {
@@ -602,401 +777,827 @@ async function startAutomation(authId = null) {
     if (selectedIds.length === 0) return;
     
     if (confirm(`Start automation for ${selectedIds.length} prior authorization(s)?`)) {
-        for (const id of selectedIds) {
-            try {
-                const response = await fetch(`/api/prior-auths/${id}/start-automation`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (response.ok) {
-                    console.log(`Started automation for auth ${id}`);
-                }
-            } catch (error) {
-                console.error('Error starting automation:', error);
-            }
-        }
+        // Start with the first selected auth
+        const authId = selectedIds[0];
+        await runAutomationWorkflow(authId);
         clearSelection();
-        loadData();
     }
 }
 
-async function pauseAutomation(authId) {
-    if (confirm(`Pause automation for prior authorization ${authId}?`)) {
-        try {
-            const response = await fetch(`/api/prior-auths/${authId}/pause-automation`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            if (response.ok) {
-                console.log(`Paused automation for auth ${authId}`);
-                loadData();
-            } else {
-                console.error('Error pausing automation:', response.status);
-            }
-        } catch (error) {
-            console.error('Error pausing automation:', error);
-        }
-    }
-}
-
-async function approveAuth(authId) {
-    if (confirm(`Approve prior authorization ${authId}?`)) {
-        try {
-            const response = await fetch(`/api/prior-auths/${authId}/approve`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            if (response.ok) {
-                console.log(`Approved auth ${authId}`);
-                loadData();
-            } else {
-                console.error('Error approving auth:', response.status);
-            }
-        } catch (error) {
-            console.error('Error approving auth:', error);
-        }
-    }
-}
-
-async function provideFeedback(authId) {
-    const feedback = prompt('Enter feedback for prior authorization ' + authId + ':');
-    if (feedback) {
-        try {
-            const response = await fetch(`/api/prior-auths/${authId}/provide-feedback`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ feedback: feedback })
-            });
-            if (response.ok) {
-                console.log(`Provided feedback for auth ${authId}`);
-                loadData();
-            } else {
-                console.error('Error providing feedback:', response.status);
-            }
-        } catch (error) {
-            console.error('Error providing feedback:', error);
-        }
-    }
-}
-
-async function approveStep(authId) {
-    if (confirm(`Approve current step for prior authorization ${authId}?`)) {
-        try {
-            const response = await fetch(`/api/prior-auths/${authId}/approve-step`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            if (response.ok) {
-                console.log(`Approved step for auth ${authId}`);
-                loadData();
-            } else {
-                console.error('Error approving step:', response.status);
-            }
-        } catch (error) {
-            console.error('Error approving step:', error);
-        }
-    }
-}
-
-async function requestChanges(authId) {
-    const changes = prompt('Enter changes requested for prior authorization ' + authId + ':');
-    if (changes) {
-        try {
-            const response = await fetch(`/api/prior-auths/${authId}/request-changes`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ changes: changes })
-            });
-            if (response.ok) {
-                console.log(`Requested changes for auth ${authId}`);
-                loadData();
-            } else {
-                console.error('Error requesting changes:', response.status);
-            }
-        } catch (error) {
-            console.error('Error requesting changes:', error);
-        }
-    }
-}
-
-async function viewEHRData(authId) {
+async function runAutomationWorkflow(authId) {
+    // Get auth data
     const auth = allPriorAuths.find(a => a.id == authId);
     if (!auth) return;
+    
+    automationData = auth;
+    currentAutomationStep = 1;
+    stepResults = {};
+    
+    // Show automation popup
+    document.getElementById('automation-popup').style.display = 'block';
+    
+    // Start the workflow
+    await executeAutomationStep(currentAutomationStep);
+}
 
-    const modalBody = document.getElementById('modal-body');
-    modalBody.innerHTML = `
-        <h3>EHR Data for Prior Authorization ${authId}</h3>
-        <div class="ehr-data-container">
-            <h4>Patient Information</h4>
-            <p><strong>Name:</strong> ${auth.patient_name}</p>
-            <p><strong>MRN:</strong> ${auth.patient_mrn}</p>
-            <p><strong>DOB:</strong> ${formatDate(auth.patient_dob)}</p>
-            <p><strong>Gender:</strong> ${auth.patient_gender}</p>
-            <p><strong>Insurance:</strong> ${auth.insurance_provider}</p>
+async function executeAutomationStep(stepNumber) {
+    console.log('executeAutomationStep called with stepNumber:', stepNumber);
+    const step = automationSteps[stepNumber - 1];
+    if (!step) {
+        console.error('Step not found for stepNumber:', stepNumber);
+        return;
+    }
+    
+    console.log('Executing step:', step);
+    
+    // Update UI
+    updateStepDisplay(step);
+    
+    // Execute step-specific logic
+    switch (step.content) {
+        case 'coverage':
+            console.log('Executing coverage determination...');
+            await executeCoverageDetermination();
+            break;
+        case 'insurance':
+            console.log('Executing insurance documentation...');
+            await executeInsuranceDocumentation();
+            break;
+        case 'screening':
+            console.log('Executing screening...');
+            await executeScreening();
+            break;
+        case 'extraction':
+            console.log('Executing data extraction...');
+            await executeDataExtraction();
+            break;
+        case 'form':
+            console.log('Executing form completion...');
+            await executeFormCompletion();
+            break;
+        default:
+            console.error('Unknown step content:', step.content);
+    }
+}
 
-            <h4>Service Information</h4>
-            <p><strong>Service Type:</strong> ${auth.service_type}</p>
-            <p><strong>CPT Code:</strong> ${auth.cpt_code || 'N/A'}</p>
-            <p><strong>Procedure Date:</strong> ${formatDate(auth.procedure_date)}</p>
-            <p><strong>Notes:</strong> ${auth.notes}</p>
+function updateStepDisplay(step) {
+    document.getElementById('current-step-icon').innerHTML = `<i class="${step.icon}"></i>`;
+    document.getElementById('current-step-title').textContent = `Step ${step.id}: ${step.title}`;
+    document.getElementById('current-step-description').textContent = step.description;
+    document.getElementById('current-step-status').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running';
+    
+    // Update progress
+    const progress = (step.id / automationSteps.length) * 100;
+    document.getElementById('automation-progress-fill').style.width = `${progress}%`;
+    document.getElementById('automation-progress-text').textContent = `${Math.round(progress)}% Complete`;
+}
 
-            <h4>Clinical History</h4>
-            <p><strong>Diagnosis:</strong> ${auth.diagnosis || 'N/A'}</p>
-            <p><strong>Treatment History:</strong> ${auth.treatment_history || 'N/A'}</p>
-            <p><strong>Allergies:</strong> ${auth.allergies || 'N/A'}</p>
+async function executeCoverageDetermination() {
+    const content = document.getElementById('step-content-container');
+    
+    await streamText(content, `
+        <div class="coverage-result">
+            <h4>Step 1: Coverage Determination</h4>
+            <div class="result-card">
+                <div class="gpt-search-simulation">
+                    <div class="search-query">
+                        <i class="fas fa-search"></i>
+                        <span>Searching Medicare NCD 90.2 coverage criteria for CPT ${automationData.cpt_code}...</span>
+                    </div>
+                    <div class="search-results">
+                        <div class="result-item">
+                            <strong>NCD 90.2 Coverage Found:</strong>
+                            <p>Comprehensive genomic profiling (CGP) is covered for patients with advanced cancer when:</p>
+                            <ul>
+                                <li>Patient has advanced cancer (stage III/IV)</li>
+                                <li>No prior comprehensive NGS testing on same tumor</li>
+                                <li>FDA-approved companion diagnostic or MAC coverage</li>
+                                <li>Results will guide treatment decisions</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="coverage-analysis">
+                    <h5>Patient-Specific Analysis:</h5>
+                    <div class="analysis-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span><strong>Diagnosis:</strong> ${automationData.diagnosis} - Stage ${automationData.stage || 'IV'}</span>
+                    </div>
+                    <div class="analysis-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span><strong>Advanced Cancer:</strong> ${automationData.stage === 'IV' || automationData.stage === 'III' ? 'Yes' : 'No'}</span>
+                    </div>
+                    <div class="analysis-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span><strong>Prior NGS Testing:</strong> ${automationData.prior_tests_count || 0} previous tests</span>
+                    </div>
+                    <div class="analysis-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span><strong>FDA Coverage:</strong> CPT ${automationData.cpt_code} has FDA-approved companion diagnostic</span>
+                    </div>
+                </div>
+                
+                <div class="coverage-decision">
+                    <div class="decision-badge success">
+                        <i class="fas fa-check"></i>
+                        <span>Coverage Confirmed</span>
+                    </div>
+                    <p><strong>Decision:</strong> Patient meets NCD 90.2 criteria. Coverage is confirmed for ${automationData.service_type}.</p>
+                </div>
+            </div>
+        </div>
+    `, 'coverage');
+    
+    stepResults.coverage = {
+        status: 'completed',
+        coverage_confirmed: true,
+        ncd_criteria_met: true,
+        decision: 'Proceed with prior authorization'
+    };
+    
+    await moveToNextStep();
+}
 
-            <h4>EHR Documents</h4>
-            <p>Documents linked to this authorization:</p>
-            <ul>
-                ${auth.ehr_documents ? auth.ehr_documents.map(doc => `<li>${doc.name} (Type: ${doc.type})</li>`).join('') : 'No documents linked.'}
-            </ul>
+async function executeInsuranceDocumentation() {
+    const content = document.getElementById('step-content-container');
+    
+    await streamText(content, `
+        <div class="insurance-documentation">
+            <h4>Step 2: Insurance Requirements Extraction</h4>
+            <div class="result-card">
+                <div class="gpt-search-simulation">
+                    <div class="search-query">
+                        <i class="fas fa-search"></i>
+                        <span>Searching ${automationData.insurance_provider} requirements for ${automationData.service_type}...</span>
+                    </div>
+                    <div class="search-results">
+                        <div class="result-item">
+                            <strong>Insurance Requirements Found:</strong>
+                            <div class="requirements-list">
+                                <div class="requirement-item">
+                                    <i class="fas fa-file-medical"></i>
+                                    <span>Pathology report confirming cancer diagnosis</span>
+                                </div>
+                                <div class="requirement-item">
+                                    <i class="fas fa-dna"></i>
+                                    <span>Molecular testing order with clinical rationale</span>
+                                </div>
+                                <div class="requirement-item">
+                                    <i class="fas fa-user-md"></i>
+                                    <span>Oncology consultation note</span>
+                                </div>
+                                <div class="requirement-item">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    <span>Date of diagnosis and staging information</span>
+                                </div>
+                                <div class="requirement-item">
+                                    <i class="fas fa-flask"></i>
+                                    <span>Specimen adequacy report (tumor purity > 20%)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="requirements-mapping">
+                    <h5>Requirements Mapping to EHR Data:</h5>
+                    <div class="mapping-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span><strong>Pathology Report:</strong> Available in EHR (${automationData.ehr_documents.includes('Pathology Report') ? '✓' : '✗'})</span>
+                    </div>
+                    <div class="mapping-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span><strong>Molecular Order:</strong> Available in EHR (${automationData.ehr_documents.includes('Genomic Testing Report') ? '✓' : '✗'})</span>
+                    </div>
+                    <div class="mapping-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span><strong>Oncology Note:</strong> Available in EHR (${automationData.ehr_documents.includes('Clinical Notes') ? '✓' : '✗'})</span>
+                    </div>
+                    <div class="mapping-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span><strong>Staging Info:</strong> Available in EHR (✓)</span>
+                    </div>
+                    <div class="mapping-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span><strong>Specimen Adequacy:</strong> Available in EHR (✓)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `, 'insurance');
+    
+    stepResults.insurance = {
+        status: 'completed',
+        requirements_extracted: true,
+        all_documents_available: true,
+        action: 'proceed_to_screening'
+    };
+    
+    await moveToNextStep();
+}
+
+async function executeScreening() {
+    const content = document.getElementById('step-content-container');
+    
+    await streamText(content, `
+        <div class="screening-analysis">
+            <h4>Step 3: Clinical Screening & EHR Analysis</h4>
+            <div class="result-card">
+                <div class="ehr-screening">
+                    <h5>EHR Data Screening Results:</h5>
+                    
+                    <div class="screening-section">
+                        <h6><i class="fas fa-file-medical"></i> Pathology Review</h6>
+                        <div class="screening-item success">
+                            <i class="fas fa-check-circle"></i>
+                            <span><strong>Diagnosis Confirmed:</strong> ${automationData.diagnosis}</span>
+                        </div>
+                        <div class="screening-item success">
+                            <i class="fas fa-check-circle"></i>
+                            <span><strong>Stage:</strong> ${automationData.stage || 'IV'} - Meets advanced cancer criteria</span>
+                        </div>
+                        <div class="screening-item success">
+                            <i class="fas fa-check-circle"></i>
+                            <span><strong>Tumor Purity:</strong> 30% - Adequate for testing</span>
+                        </div>
+                    </div>
+                    
+                    <div class="screening-section">
+                        <h6><i class="fas fa-dna"></i> Molecular Testing History</h6>
+                        <div class="screening-item success">
+                            <i class="fas fa-check-circle"></i>
+                            <span><strong>Prior Tests:</strong> ${automationData.prior_tests_count || 0} previous tests</span>
+                        </div>
+                        <div class="screening-item success">
+                            <i class="fas fa-check-circle"></i>
+                            <span><strong>No Prior Comprehensive NGS:</strong> Meets NCD 90.2 criteria</span>
+                        </div>
+                    </div>
+                    
+                    <div class="screening-section">
+                        <h6><i class="fas fa-user-md"></i> Clinical Documentation</h6>
+                        <div class="screening-item success">
+                            <i class="fas fa-check-circle"></i>
+                            <span><strong>Oncology Consultation:</strong> Available and complete</span>
+                        </div>
+                        <div class="screening-item success">
+                            <i class="fas fa-check-circle"></i>
+                            <span><strong>Treatment Plan:</strong> Molecular profiling indicated for treatment selection</span>
+                        </div>
+                        <div class="screening-item success">
+                            <i class="fas fa-check-circle"></i>
+                            <span><strong>Genetic Counseling:</strong> ${automationData.ehr_documents.includes('Genetic Counseling Note') ? 'Completed' : 'Not required'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="screening-section">
+                        <h6><i class="fas fa-flask"></i> Specimen Quality</h6>
+                        <div class="screening-item success">
+                            <i class="fas fa-check-circle"></i>
+                            <span><strong>Specimen Type:</strong> Excisional biopsy - Adequate</span>
+                        </div>
+                        <div class="screening-item success">
+                            <i class="fas fa-check-circle"></i>
+                            <span><strong>Fixation:</strong> Alcohol-based - Compatible with testing</span>
+                        </div>
+                        <div class="screening-item success">
+                            <i class="fas fa-check-circle"></i>
+                            <span><strong>Tumor Cellularity:</strong> 30% - Meets minimum requirement</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="decision-card success">
+                    <h5><i class="fas fa-thumbs-up"></i> Screening Decision</h5>
+                    <p><strong>Result:</strong> All clinical criteria met. Patient is appropriate candidate for ${automationData.service_type}.</p>
+                    <p><strong>Action:</strong> Proceed to data extraction phase.</p>
+                </div>
+            </div>
+        </div>
+    `, 'screening');
+    
+    stepResults.screening = {
+        status: 'completed',
+        clinical_criteria_met: true,
+        ehr_completeness: 'complete',
+        decision: 'continue_automation'
+    };
+    
+    await moveToNextStep();
+}
+
+async function executeDataExtraction() {
+    const content = document.getElementById('step-content-container');
+    
+    await streamText(content, `
+        <div class="data-extraction">
+            <h4>Step 4: Intelligent Data Extraction from EHR</h4>
+            <div class="result-card">
+                <div class="extraction-process">
+                    <h5>Extracting Data from Clinical Documents:</h5>
+                    
+                    <div class="extraction-source">
+                        <h6><i class="fas fa-file-medical"></i> Pathology Report Analysis</h6>
+                        <div class="extracted-data">
+                            <div class="data-item">
+                                <strong>Diagnosis:</strong> ${automationData.diagnosis}
+                            </div>
+                            <div class="data-item">
+                                <strong>Histology:</strong> Adenocarcinoma
+                            </div>
+                            <div class="data-item">
+                                <strong>Grade:</strong> G3
+                            </div>
+                            <div class="data-item">
+                                <strong>Tumor Size:</strong> 60mm
+                            </div>
+                            <div class="data-item">
+                                <strong>Stage:</strong> ${automationData.stage || 'IV'}
+                            </div>
+                            <div class="data-item">
+                                <strong>Specimen:</strong> Excisional biopsy, 30% tumor purity
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="extraction-source">
+                        <h6><i class="fas fa-user-md"></i> Clinical Notes Analysis</h6>
+                        <div class="extracted-data">
+                            <div class="data-item">
+                                <strong>ECOG Performance Status:</strong> 1
+                            </div>
+                            <div class="data-item">
+                                <strong>Treatment History:</strong> Pembrolizumab ongoing
+                            </div>
+                            <div class="data-item">
+                                <strong>Clinical Rationale:</strong> "Molecular profiling ordered for treatment selection"
+                            </div>
+                            <div class="data-item">
+                                <strong>Family History:</strong> ${automationData.family_history_count || 0} relevant family members
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="extraction-source">
+                        <h6><i class="fas fa-dna"></i> Molecular Testing Data</h6>
+                        <div class="extracted-data">
+                            <div class="data-item">
+                                <strong>Test Name:</strong> ${automationData.service_type}
+                            </div>
+                            <div class="data-item">
+                                <strong>CPT Code:</strong> ${automationData.cpt_code}
+                            </div>
+                            <div class="data-item">
+                                <strong>Methodology:</strong> WES + RNA
+                            </div>
+                            <div class="data-item">
+                                <strong>Genes Analyzed:</strong> 334 genes
+                            </div>
+                            <div class="data-item">
+                                <strong>Lab:</strong> GenomeDx Clinical (CLIA: 06D2223334)
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="extraction-source">
+                        <h6><i class="fas fa-flask"></i> Lab Results Integration</h6>
+                        <div class="extracted-data">
+                            <div class="data-item">
+                                <strong>Hemoglobin:</strong> 10.9 g/dL
+                            </div>
+                            <div class="data-item">
+                                <strong>Platelets:</strong> 303 K/uL
+                            </div>
+                            <div class="data-item">
+                                <strong>Creatinine:</strong> 1.2 mg/dL
+                            </div>
+                            <div class="data-item">
+                                <strong>Albumin:</strong> 4.31 g/dL
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="extraction-summary">
+                    <h5><i class="fas fa-check-circle"></i> Data Extraction Complete</h5>
+                    <p><strong>Summary:</strong> Successfully extracted all required clinical data from EHR sources with proper citations.</p>
+                    <p><strong>Data Quality:</strong> All fields populated with verified clinical information.</p>
+                    <p><strong>Next Step:</strong> Form completion with extracted data.</p>
+                </div>
+            </div>
+        </div>
+    `, 'extraction');
+    
+    stepResults.extraction = {
+        status: 'completed',
+        data_extracted: true,
+        all_fields_populated: true,
+        citations_provided: true,
+        action: 'proceed_to_form'
+    };
+    
+    await moveToNextStep();
+}
+
+async function executeFormCompletion() {
+    const content = document.getElementById('step-content-container');
+    
+    await streamText(content, `
+        <div class="form-completion">
+            <h4>Step 5: Prior Authorization Form Completion</h4>
+            <div class="result-card">
+                <div class="form-preview">
+                    <h5>Medicare Prior Authorization Form (Medicare Advantage HMO)</h5>
+                    
+                    <div class="form-section">
+                        <h6>Patient Information</h6>
+                        <div class="form-field">
+                            <label>Patient Name:</label>
+                            <span>${automationData.patient_name}</span>
+                        </div>
+                        <div class="form-field">
+                            <label>MRN:</label>
+                            <span>${automationData.patient_mrn}</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Date of Birth:</label>
+                            <span>${automationData.patient_dob}</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Insurance:</label>
+                            <span>${automationData.insurance_provider} (${automationData.insurance_plan})</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h6>Service Request</h6>
+                        <div class="form-field">
+                            <label>Service:</label>
+                            <span>${automationData.service_type}</span>
+                        </div>
+                        <div class="form-field">
+                            <label>CPT Code:</label>
+                            <span>${automationData.cpt_code}</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Diagnosis:</label>
+                            <span>${automationData.diagnosis} (ICD-10: ${automationData.icd10 || 'C34.90'})</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Clinical Rationale:</label>
+                            <span>Molecular profiling for treatment selection in advanced cancer</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h6>Clinical Documentation</h6>
+                        <div class="form-field">
+                            <label>Pathology Report:</label>
+                            <span>✓ Attached (Adenocarcinoma, Stage ${automationData.stage || 'IV'})</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Oncology Consultation:</label>
+                            <span>✓ Attached (Dr. Jordan Rivera)</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Molecular Testing Order:</label>
+                            <span>✓ Attached (${automationData.service_type})</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Genetic Counseling:</label>
+                            <span>${automationData.ehr_documents.includes('Genetic Counseling Note') ? '✓ Attached' : 'Not required'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h6>Coverage Criteria</h6>
+                        <div class="form-field">
+                            <label>NCD 90.2 Criteria Met:</label>
+                            <span>✓ Yes - Advanced cancer, no prior comprehensive NGS</span>
+                        </div>
+                        <div class="form-field">
+                            <label>FDA Coverage:</label>
+                            <span>✓ Yes - CPT ${automationData.cpt_code} has companion diagnostic</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Clinical Indication:</label>
+                            <span>✓ Yes - Treatment selection for advanced cancer</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-validation">
+                    <h5><i class="fas fa-check-circle"></i> Form Validation</h5>
+                    <div class="validation-item success">
+                        <i class="fas fa-check"></i>
+                        <span>All required fields completed</span>
+                    </div>
+                    <div class="validation-item success">
+                        <i class="fas fa-check"></i>
+                        <span>Clinical documentation attached</span>
+                    </div>
+                    <div class="validation-item success">
+                        <i class="fas fa-check"></i>
+                        <span>Coverage criteria verified</span>
+                    </div>
+                    <div class="validation-item success">
+                        <i class="fas fa-check"></i>
+                        <span>Diagnosis codes validated</span>
+                    </div>
+                    <div class="validation-item success">
+                        <i class="fas fa-check"></i>
+                        <span>Prior authorization form ready for submission</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `, 'form');
+    
+    stepResults.form = {
+        status: 'completed',
+        form_completed: true,
+        all_fields_validated: true,
+        ready_for_submission: true,
+        action: 'complete_automation'
+    };
+    
+    // Complete the automation
+    await moveToNextStep();
+}
+
+async function moveToNextStep() {
+    console.log('moveToNextStep called. Current step before increment:', currentAutomationStep);
+    currentAutomationStep++;
+    console.log('Current step after increment:', currentAutomationStep);
+    
+    if (currentAutomationStep <= automationSteps.length) {
+        console.log('Moving to next step:', currentAutomationStep);
+        // Add delay for visual effect
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await executeAutomationStep(currentAutomationStep);
+    } else {
+        console.log('Automation complete!');
+        // Automation complete
+        document.getElementById('current-step-status').innerHTML = '<i class="fas fa-check-circle"></i> Complete';
+        document.getElementById('automation-progress-fill').style.width = '100%';
+        document.getElementById('automation-progress-text').textContent = '100% Complete';
+        
+        // Show completion message
+        const container = document.getElementById('step-content-container');
+        container.innerHTML = `
+            <div class="automation-complete">
+                <div class="completion-card">
+                    <i class="fas fa-check-circle"></i>
+                    <h4>Automation Complete!</h4>
+                    <p>The AI agent has successfully processed the prior authorization request.</p>
+                    <div class="completion-summary">
+                        <h5>Summary:</h5>
+                        <ul>
+                            <li>✓ Coverage determination completed</li>
+                            <li>✓ Insurance requirements identified</li>
+                            <li>✓ Screening passed - all documentation complete</li>
+                            <li>✓ EHR data extracted with citations</li>
+                            <li>✓ Form populated and ready for review</li>
+                        </ul>
+                    </div>
+            </div>
         </div>
     `;
-    document.getElementById('auth-detail-modal').style.display = 'block';
+    }
+}
+
+async function streamText(container, html, stepType = 'default') {
+    // Clear container
+    container.innerHTML = '';
+    
+    // Variable timing based on step complexity
+    const timingMap = {
+        'coverage': 15,      // Fast: Simple database lookup
+        'insurance': 35,     // Slow: API calls, GPT-5 search
+        'screening': 25,     // Medium: EHR analysis
+        'extraction': 40,    // Slowest: Complex data extraction with citations
+        'form': 20,          // Fast: Form population
+        'default': 25        // Default timing
+    };
+    
+    const delayPerWord = timingMap[stepType] || timingMap.default;
+    
+    // Simulate streaming effect
+    const words = html.split(' ');
+    let currentText = '';
+    
+    for (let i = 0; i < words.length; i++) {
+        currentText += words[i] + ' ';
+        container.innerHTML = currentText;
+        await new Promise(resolve => setTimeout(resolve, delayPerWord));
+    }
+}
+
+function closeAutomationPopup() {
+    document.getElementById('automation-popup').style.display = 'none';
+    document.getElementById('automation-actions').style.display = 'none';
+    if (streamingInterval) {
+        clearInterval(streamingInterval);
+    }
+}
+
+function approveCurrentStep() {
+    // Hide action buttons
+    document.getElementById('automation-actions').style.display = 'none';
+    
+    // Continue to next step
+    moveToNextStep();
+}
+
+function requestChanges() {
+    const changes = prompt('Enter the changes you would like to request:');
+    if (changes) {
+        // Log the changes request
+        console.log('Changes requested:', changes);
+        
+        // Continue to next step
+        approveCurrentStep();
+    }
+}
+
+function sendToClinician() {
+    // Show clinician message modal
+    const messageContent = `
+        <div class="message-body">
+            <p><strong>To:</strong> Dr. Sarah Johnson, Oncology</p>
+            <p><strong>Subject:</strong> Prior Authorization - Missing Documentation</p>
+            <p><strong>Patient:</strong> ${automationData.patient_name} (MRN: ${automationData.patient_mrn})</p>
+            <br>
+            <p>Dear Dr. Johnson,</p>
+            <p>I am processing a prior authorization request for ${automationData.service_type} for ${automationData.patient_name}.</p>
+            <p>The insurance provider requires a genetic counseling consultation note to approve this request. This documentation is currently missing from the patient's record.</p>
+            <p><strong>Required Action:</strong> Please provide a genetic counseling consultation note for this patient.</p>
+            <p>Once this documentation is available, I can complete the prior authorization submission.</p>
+            <br>
+            <p>Thank you,<br>AI Prior Authorization Agent</p>
+        </div>
+    `;
+    
+    document.getElementById('clinician-message-content').innerHTML = messageContent;
+    document.getElementById('clinician-message-modal').style.display = 'block';
+}
+
+function closeClinicianModal() {
+    document.getElementById('clinician-message-modal').style.display = 'none';
 }
 
 function viewDetails(authId) {
-    const auth = allPriorAuths.find(a => a.id == authId);
-    if (!auth) return;
+    // Find the auth data
+    const auth = allPriorAuths.find(a => a.id === authId);
+    if (!auth) {
+        console.error('Auth not found:', authId);
+        return;
+    }
     
-    const modalBody = document.getElementById('modal-body');
-    modalBody.innerHTML = `
+    // Create the modal content
+    const modalContent = `
         <div class="auth-details">
             <div class="detail-section">
                 <h3>Patient Information</h3>
-                <p><strong>Name:</strong> ${auth.patient_name}</p>
-                <p><strong>MRN:</strong> ${auth.patient_mrn}</p>
-                <p><strong>Clinical Urgency:</strong> ${auth.clinical_urgency}</p>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Patient Name:</label>
+                        <span>${auth.patient_name}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>MRN:</label>
+                        <span>${auth.patient_mrn}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Date of Birth:</label>
+                        <span>${auth.patient_dob || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Gender:</label>
+                        <span>${auth.patient_gender || 'N/A'}</span>
+                    </div>
+                </div>
             </div>
+            
             <div class="detail-section">
                 <h3>Service Information</h3>
-                <p><strong>Service Type:</strong> ${auth.service_type}</p>
-                <p><strong>CPT Code:</strong> ${auth.cpt_code || 'N/A'}</p>
-                <p><strong>Notes:</strong> ${auth.notes}</p>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Service Type:</label>
+                        <span>${auth.service_type}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>CPT Code:</label>
+                        <span>${auth.cpt_code || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Diagnosis:</label>
+                        <span>${auth.diagnosis}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Procedure Date:</label>
+                        <span>${auth.procedure_date || 'N/A'}</span>
+                    </div>
+                </div>
             </div>
+            
             <div class="detail-section">
                 <h3>Insurance Information</h3>
-                <p><strong>Provider:</strong> ${auth.insurance_provider}</p>
-                <p><strong>Requirements:</strong> ${auth.insurance_requirements}</p>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Insurance Provider:</label>
+                        <span>${auth.insurance_provider}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Insurance Requirements:</label>
+                        <span>${auth.insurance_requirements || 'N/A'}</span>
+                    </div>
+                </div>
             </div>
+            
             <div class="detail-section">
-                <h3>Automation Status</h3>
-                <p><strong>Status:</strong> ${getStatusDisplay(auth.status)}</p>
-                <p><strong>Current Step:</strong> ${getStepName(auth.current_step || 1)}</p>
-                <p><strong>Progress:</strong> ${Math.round(((auth.current_step || 1) / 5) * 100)}%</p>
-                <p><strong>Created:</strong> ${formatDate(auth.created_date)}</p>
-                <p><strong>Due:</strong> ${formatDate(auth.due_date)}</p>
-                <p><strong>Last Updated:</strong> ${auth.last_updated}</p>
+                <h3>Status Information</h3>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Status:</label>
+                        <span class="status-badge ${auth.status}">${auth.status}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Current Step:</label>
+                        <span>${auth.current_step || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Automation Status:</label>
+                        <span>${auth.automation_status || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Assigned To:</label>
+                        <span>${auth.assigned_to || 'Unassigned'}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="detail-section">
+                <h3>Timeline</h3>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Created Date:</label>
+                        <span>${auth.created_date}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Due Date:</label>
+                        <span>${auth.due_date}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Last Updated:</label>
+                        <span>${auth.last_updated}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="detail-section">
+                <h3>Additional Information</h3>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Clinical Urgency:</label>
+                        <span>${auth.clinical_urgency || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Treatment History:</label>
+                        <span>${auth.treatment_history || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Allergies:</label>
+                        <span>${auth.allergies || 'None'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Notes:</label>
+                        <span>${auth.notes || 'No notes'}</span>
+                    </div>
+                </div>
             </div>
         </div>
     `;
     
-    document.getElementById('auth-detail-modal').style.display = 'block';
-}
-
-function viewStepDetails(authId) {
-    const auth = allPriorAuths.find(a => a.id == authId);
-    if (!auth) return;
+    // Populate the modal body
+    document.getElementById('modal-body').innerHTML = modalContent;
     
-    const currentStep = auth.current_step || 1;
-    const stepTitle = document.getElementById('step-modal-title');
-    const stepBody = document.getElementById('step-modal-body');
-    
-    stepTitle.textContent = `Step ${currentStep}: ${getStepName(currentStep)}`;
-    
-    stepBody.innerHTML = `
-        <div class="step-details">
-            <div class="step-progress">
-                <h3>Automation Progress</h3>
-                <div class="step-timeline">
-                    ${generateStepTimeline(auth)}
-                </div>
-            </div>
-            <div class="step-content">
-                <h3>Current Step Details</h3>
-                ${generateStepContent(auth, currentStep)}
-            </div>
-            <div class="step-actions">
-                <h3>Available Actions</h3>
-                ${generateStepActions(auth, currentStep)}
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('step-detail-modal').style.display = 'block';
-}
-
-function generateStepTimeline(auth) {
-    const steps = [
-        { name: 'Coverage Determination', icon: 'fas fa-search' },
-        { name: 'Requirements Extraction', icon: 'fas fa-file-medical' },
-        { name: 'Screening', icon: 'fas fa-clipboard-check' },
-        { name: 'Data Extraction', icon: 'fas fa-database' },
-        { name: 'Form Submission', icon: 'fas fa-paper-plane' }
-    ];
-    
-    const currentStep = auth.current_step || 1;
-    
-    return steps.map((step, index) => {
-        const stepNum = index + 1;
-        const status = stepNum < currentStep ? 'completed' : 
-                      stepNum === currentStep ? 'current' : 'pending';
-        
-        return `
-            <div class="timeline-step ${status}">
-                <div class="timeline-icon">
-                    <i class="${step.icon}"></i>
-                </div>
-                <div class="timeline-content">
-                    <h4>Step ${stepNum}: ${step.name}</h4>
-                    <p>${getStepStatusText(stepNum, currentStep, auth.status)}</p>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-function getStepStatusText(stepNum, currentStep, status) {
-    if (stepNum < currentStep) {
-        return 'Completed successfully';
-    } else if (stepNum === currentStep) {
-        if (status === 'running') {
-            return 'Currently being processed by AI agent';
-        } else if (status === 'review') {
-            return 'Awaiting human review';
-        } else if (status === 'feedback') {
-            return 'Requires additional input';
-        } else {
-            return 'Pending';
-        }
+    // Update the action button based on status
+    const actionBtn = document.getElementById('modal-action-btn');
+    if (auth.status === 'pending') {
+        actionBtn.textContent = 'Start Automation';
+        actionBtn.onclick = () => startAutomation(auth.id);
+    } else if (auth.status === 'running') {
+        actionBtn.textContent = 'View Progress';
+        actionBtn.onclick = () => viewAutomationProgress(auth.id);
     } else {
-        return 'Not started';
-    }
-}
-
-function generateStepContent(auth, currentStep) {
-    const stepContents = {
-        1: `
-            <div class="step-content-item">
-                <h4>Coverage Determination</h4>
-                <p>Checking if CPT code ${auth.cpt_code} is covered by ${auth.insurance_provider}.</p>
-                <div class="coverage-result">
-                    <strong>Result:</strong> <span class="status-badge status-pending">In Progress</span>
-                </div>
-            </div>
-        `,
-        2: `
-            <div class="step-content-item">
-                <h4>Requirements Extraction</h4>
-                <p>Extracting clinical requirements and required documents for ${auth.service_type}.</p>
-                <div class="requirements-list">
-                    <strong>Identified Requirements:</strong>
-                    <ul>
-                        <li>Clinical documentation supporting medical necessity</li>
-                        <li>Provider credentials and specialty</li>
-                        <li>Patient diagnosis and history</li>
-                        <li>Prior treatment records</li>
-                    </ul>
-                </div>
-            </div>
-        `,
-        3: `
-            <div class="step-content-item">
-                <h4>Screening</h4>
-                <p>Verifying EHR data completeness and procedure appropriateness.</p>
-                <div class="screening-results">
-                    <strong>Screening Results:</strong>
-                    <ul>
-                        <li>✅ Patient demographics complete</li>
-                        <li>✅ Insurance information verified</li>
-                        <li>⚠️ Missing: Recent lab results</li>
-                        <li>✅ Procedure appropriateness confirmed</li>
-                    </ul>
-                </div>
-            </div>
-        `,
-        4: `
-            <div class="step-content-item">
-                <h4>Data Extraction</h4>
-                <p>Extracting relevant data from EHR with citations.</p>
-                <div class="extraction-results">
-                    <strong>Extracted Data:</strong>
-                    <div class="data-item">
-                        <span class="data-label">Diagnosis:</span>
-                        <span class="data-value">Metastatic lung cancer (ICD-10: C78.00)</span>
-                        <span class="data-source">Source: Progress Note 2024-01-15</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Treatment History:</span>
-                        <span class="data-value">Previous chemotherapy cycles documented</span>
-                        <span class="data-source">Source: Treatment Plan 2024-01-10</span>
-                    </div>
-                </div>
-            </div>
-        `,
-        5: `
-            <div class="step-content-item">
-                <h4>Form Submission</h4>
-                <p>Preparing form for submission after human review.</p>
-                <div class="form-status">
-                    <strong>Form Status:</strong> <span class="status-badge status-pending">Ready for Review</span>
-                    <div class="form-preview">
-                        <p>Form has been populated with extracted data and is ready for human verification before submission.</p>
-                    </div>
-                </div>
-            </div>
-        `
-    };
-    
-    return stepContents[currentStep] || '<p>Step details not available.</p>';
-}
-
-function generateStepActions(auth, currentStep) {
-    const actions = [];
-    
-    if (auth.status === 'running') {
-        actions.push(`
-            <button class="btn btn-warning" onclick="pauseAutomation(${auth.id})">
-                <i class="fas fa-pause"></i> Pause Automation
-            </button>
-        `);
-    } else if (auth.status === 'review') {
-        actions.push(`
-            <button class="btn btn-success" onclick="approveStep(${auth.id})">
-                <i class="fas fa-check"></i> Approve & Continue
-            </button>
-            <button class="btn btn-warning" onclick="requestChanges(${auth.id})">
-                <i class="fas fa-edit"></i> Request Changes
-            </button>
-        `);
-    } else if (auth.status === 'feedback') {
-        actions.push(`
-            <button class="btn btn-info" onclick="provideFeedback(${auth.id})">
-                <i class="fas fa-comment"></i> Provide Feedback
-            </button>
-        `);
+        actionBtn.textContent = 'View Details';
+        actionBtn.onclick = () => closeModal();
     }
     
-    actions.push(`
-        <button class="btn btn-secondary" onclick="viewEHRData(${auth.id})">
-            <i class="fas fa-database"></i> View EHR Data
-        </button>
-    `);
-    
-    return actions.join('');
+    // Show the modal
+    document.getElementById('auth-detail-modal').style.display = 'block';
 }
 
 function closeModal() {
@@ -1007,20 +1608,649 @@ function closeStepModal() {
     document.getElementById('step-detail-modal').style.display = 'none';
 }
 
-function showLoading(show) {
-    document.getElementById('loading-spinner').style.display = show ? 'flex' : 'none';
+function viewStepDetails(authId) {
+    // Find the auth data
+    const auth = allPriorAuths.find(a => a.id === authId);
+    if (!auth) {
+        console.error('Auth not found:', authId);
+        return;
+    }
+    
+    // Parse step details from JSON
+    let stepDetails = {};
+    try {
+        stepDetails = JSON.parse(auth.step_details || '{}');
+    } catch (e) {
+        console.error('Error parsing step details:', e);
+    }
+    
+    // Create step details content
+    const stepContent = `
+        <div class="step-details">
+            <div class="step-overview">
+                <h3>Automation Progress</h3>
+                <div class="step-progress">
+                    <div class="step-item ${auth.current_step >= 1 ? 'completed' : 'pending'}">
+                        <div class="step-number">1</div>
+                        <div class="step-info">
+                            <h4>Coverage Determination</h4>
+                            <p>${stepDetails.step1?.details || 'Not started'}</p>
+                        </div>
+                    </div>
+                    <div class="step-item ${auth.current_step >= 2 ? 'completed' : 'pending'}">
+                        <div class="step-number">2</div>
+                        <div class="step-info">
+                            <h4>Insurance Documentation</h4>
+                            <p>${stepDetails.step2?.details || 'Not started'}</p>
+                        </div>
+                    </div>
+                    <div class="step-item ${auth.current_step >= 3 ? 'completed' : 'pending'}">
+                        <div class="step-number">3</div>
+                        <div class="step-info">
+                            <h4>Screening</h4>
+                            <p>${stepDetails.step3?.details || 'Not started'}</p>
+                        </div>
+                    </div>
+                    <div class="step-item ${auth.current_step >= 4 ? 'completed' : 'pending'}">
+                        <div class="step-number">4</div>
+                        <div class="step-info">
+                            <h4>Data Extraction</h4>
+                            <p>${stepDetails.step4?.details || 'Not started'}</p>
+                        </div>
+                    </div>
+                    <div class="step-item ${auth.current_step >= 5 ? 'completed' : 'pending'}">
+                        <div class="step-number">5</div>
+                        <div class="step-info">
+                            <h4>Form Completion</h4>
+                            <p>${stepDetails.step5?.details || 'Not started'}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="step-summary">
+                <h3>Current Status</h3>
+                <div class="status-summary">
+                    <p><strong>Current Step:</strong> ${auth.current_step || 1} of 5</p>
+                    <p><strong>Automation Status:</strong> ${auth.automation_status || 'pending'}</p>
+                    <p><strong>Overall Status:</strong> ${auth.status}</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Populate the step modal
+    document.getElementById('step-modal-title').textContent = `Step Details - ${auth.patient_name}`;
+    document.getElementById('step-modal-body').innerHTML = stepContent;
+    
+    // Show the modal
+    document.getElementById('step-detail-modal').style.display = 'block';
+}
+
+function pauseAutomation(authId) {
+    if (confirm('Are you sure you want to pause the automation for this request?')) {
+        // Call backend to pause automation
+        fetch(`/api/prior-auths/${authId}/pause-automation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Automation paused successfully');
+                loadData(); // Refresh the data
+            } else {
+                alert('Error pausing automation: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error pausing automation');
+        });
+    }
+}
+
+function approveAuth(authId) {
+    if (confirm('Are you sure you want to approve this prior authorization request?')) {
+        // Call backend to approve
+        fetch(`/api/prior-auths/${authId}/approve-step`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'approve',
+                notes: 'Approved by user'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Prior authorization approved successfully');
+                loadData(); // Refresh the data
+            } else {
+                alert('Error approving request: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error approving request');
+        });
+    }
+}
+
+function provideFeedback(authId) {
+    const feedback = prompt('Please provide feedback for this request:');
+    if (feedback) {
+        // Call backend to provide feedback
+        fetch(`/api/prior-auths/${authId}/provide-feedback`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                feedback: feedback
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Feedback submitted successfully');
+                loadData(); // Refresh the data
+            } else {
+                alert('Error submitting feedback: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error submitting feedback');
+        });
+    }
+}
+
+function inspectCompletedStep(stepNumber, stepTitle) {
+    // Get the step details from the current automation data
+    const stepResults = window.stepResults || {};
+    const stepData = stepResults[getStepKey(stepNumber)] || {};
+    
+    // Create detailed step content based on step number
+    let stepContent = '';
+    
+    switch(stepNumber) {
+        case 1:
+            stepContent = `
+                <div class="step-inspection">
+                    <h3>Step 1: Coverage Determination - Completed</h3>
+                    <div class="step-details">
+                        <div class="detail-section">
+                            <h4>Coverage Analysis</h4>
+                            <div class="coverage-result">
+                                <div class="result-card success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <div class="result-content">
+                                        <strong>Coverage Confirmed</strong>
+                                        <p>CPT code ${automationData.cpt_code} is covered under ${automationData.insurance_provider} for the specified clinical indication.</p>
+                                        <div class="coverage-details">
+                                            <p><strong>Coverage Level:</strong> Full coverage with prior authorization</p>
+                                            <p><strong>Clinical Criteria:</strong> Met - ${automationData.diagnosis}</p>
+                                            <p><strong>Documentation Required:</strong> Genetic counseling note, family history</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h4>Process Log</h4>
+                            <div class="process-log">
+                                <div class="log-entry">
+                                    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+                                    <span class="message">Starting coverage determination for CPT code ${automationData.cpt_code}</span>
+                                </div>
+                                <div class="log-entry">
+                                    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+                                    <span class="message">Checking ${automationData.insurance_provider} coverage policies</span>
+                                </div>
+                                <div class="log-entry">
+                                    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+                                    <span class="message">Coverage confirmed - proceeding to next step</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        case 2:
+            stepContent = `
+                <div class="step-inspection">
+                    <h3>Step 2: Insurance Documentation - Completed</h3>
+                    <div class="step-details">
+                        <div class="detail-section">
+                            <h4>GPT-5 Search Results</h4>
+                            <div class="search-results">
+                                <div class="search-query">
+                                    <strong>Search Query:</strong>
+                                    <p>"${automationData.insurance_provider} prior authorization requirements for CPT ${automationData.cpt_code} genetic testing ${automationData.service_type}"</p>
+                                </div>
+                                
+                                <div class="result-item">
+                                    <div class="result-header">
+                                        <i class="fas fa-file-pdf"></i>
+                                        <span>${automationData.insurance_provider} Genetic Testing Coverage Policy</span>
+                                    </div>
+                                    <div class="result-content">
+                                        <p><strong>Relevance:</strong> 95% - Direct policy document for genetic testing</p>
+                                        <p><strong>Key Requirements:</strong></p>
+                                        <ul>
+                                            <li>Genetic counselor consultation required</li>
+                                            <li>Family history documentation</li>
+                                            <li>Clinical indication documentation</li>
+                                            <li>Provider credentials verification</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h4>Extracted Requirements</h4>
+                            <div class="requirements-list">
+                                <div class="requirement-item">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Genetic counselor consultation</span>
+                                </div>
+                                <div class="requirement-item">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Family history documentation</span>
+                                </div>
+                                <div class="requirement-item">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Clinical indication documentation</span>
+                                </div>
+                                <div class="requirement-item">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Provider credentials verification</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        case 3:
+            stepContent = `
+                <div class="step-inspection">
+                    <h3>Step 3: Screening - Completed</h3>
+                    <div class="step-details">
+                        <div class="detail-section">
+                            <h4>Screening Results</h4>
+                            <div class="screening-results">
+                                <div class="screening-item success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Patient demographics complete</span>
+                                </div>
+                                <div class="screening-item success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Family history documented</span>
+                                </div>
+                                <div class="screening-item success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Genetic counseling note available</span>
+                                </div>
+                                <div class="screening-item success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Clinical indication appropriate</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h4>Screening Decision</h4>
+                            <div class="decision-card success">
+                                <i class="fas fa-check-circle"></i>
+                                <div class="decision-content">
+                                    <strong>Screening Passed</strong>
+                                    <p>All required documentation is available in the EHR.</p>
+                                    <p><strong>Action:</strong> Proceed to data extraction</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        case 4:
+            stepContent = `
+                <div class="step-inspection">
+                    <h3>Step 4: Data Extraction - Completed</h3>
+                    <div class="step-details">
+                        <div class="detail-section">
+                            <h4>Data Sources</h4>
+                            <div class="source-list">
+                                <div class="source-item">
+                                    <i class="fas fa-user"></i>
+                                    <span>Patient Demographics - EPIC Patient Record</span>
+                                </div>
+                                <div class="source-item">
+                                    <i class="fas fa-file-medical"></i>
+                                    <span>Family History - Progress Note 2024-01-15</span>
+                                </div>
+                                <div class="source-item">
+                                    <i class="fas fa-stethoscope"></i>
+                                    <span>Clinical History - Oncology Consultation 2024-01-10</span>
+                                </div>
+                                <div class="source-item">
+                                    <i class="fas fa-pills"></i>
+                                    <span>Medications - Medication List 2024-01-12</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h4>Extracted Data with Citations</h4>
+                            <div class="data-items">
+                                <div class="data-item">
+                                    <div class="data-label">Patient Name:</div>
+                                    <div class="data-value">${automationData.patient_name}</div>
+                                    <div class="data-source">Source: EPIC Patient Record</div>
+                                </div>
+                                <div class="data-item">
+                                    <div class="data-label">Date of Birth:</div>
+                                    <div class="data-value">${automationData.patient_dob}</div>
+                                    <div class="data-source">Source: EPIC Patient Record</div>
+                                </div>
+                                <div class="data-item">
+                                    <div class="data-label">Family History:</div>
+                                    <div class="data-value">Mother: breast cancer at age 45; Sister: breast cancer at age 52</div>
+                                    <div class="data-source">Source: Progress Note 2024-01-15, Dr. Johnson</div>
+                                </div>
+                                <div class="data-item">
+                                    <div class="data-label">Clinical Indication:</div>
+                                    <div class="data-value">${automationData.diagnosis}</div>
+                                    <div class="data-source">Source: Oncology Consultation 2024-01-10, Dr. Johnson</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        case 5:
+            stepContent = `
+                <div class="step-inspection">
+                    <h3>Step 5: Form Completion - Completed</h3>
+                    <div class="step-details">
+                        <div class="detail-section">
+                            <h4>Medicaid Husky Form</h4>
+                            <div class="form-preview">
+                                <div class="form-section">
+                                    <h5>Patient Information</h5>
+                                    <div class="form-field">
+                                        <label>Patient Name:</label>
+                                        <span>${automationData.patient_name}</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>Date of Birth:</label>
+                                        <span>${automationData.patient_dob}</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>MRN:</label>
+                                        <span>${automationData.patient_mrn}</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-section">
+                                    <h5>Service Information</h5>
+                                    <div class="form-field">
+                                        <label>Service Type:</label>
+                                        <span>${automationData.service_type}</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>CPT Code:</label>
+                                        <span>${automationData.cpt_code}</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>Diagnosis:</label>
+                                        <span>${automationData.diagnosis}</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-section">
+                                    <h5>Insurance Information</h5>
+                                    <div class="form-field">
+                                        <label>Insurance Provider:</label>
+                                        <span>${automationData.insurance_provider}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h4>Form Validation</h4>
+                            <div class="validation-results">
+                                <div class="validation-item success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Patient demographics verified</span>
+                                </div>
+                                <div class="validation-item success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Clinical documentation attached</span>
+                                </div>
+                                <div class="validation-item success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Insurance information verified</span>
+                                </div>
+                                <div class="validation-item success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Genetic counseling note attached</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+    }
+    
+    // Show the step inspection modal
+    document.getElementById('step-modal-title').textContent = `Step ${stepNumber}: ${stepTitle} - Inspection`;
+    document.getElementById('step-modal-body').innerHTML = stepContent;
+    document.getElementById('step-detail-modal').style.display = 'block';
+}
+
+function getStepKey(stepNumber) {
+    const stepKeys = {
+        1: 'coverage',
+        2: 'insurance',
+        3: 'screening',
+        4: 'extraction',
+        5: 'form'
+    };
+    return stepKeys[stepNumber] || 'unknown';
+}
+
+function viewAutomationProgress(authId) {
+    // Find the auth data
+    const auth = allPriorAuths.find(a => a.id === authId);
+    if (!auth) {
+        console.error('Auth not found:', authId);
+        return;
+    }
+    
+    // Set the automation data for the popup with realistic fields
+    automationData = {
+        patient_name: auth.patient_name,
+        patient_mrn: auth.patient_mrn,
+        patient_dob: auth.patient_dob,
+        patient_gender: auth.patient_gender,
+        service_type: auth.service_type,
+        cpt_code: auth.cpt_code,
+        diagnosis: auth.diagnosis,
+        icd10: auth.icd10 || 'C34.90',
+        stage: auth.stage || 'IV',
+        insurance_provider: auth.insurance_provider,
+        insurance_plan: auth.insurance_plan || 'Medicare Advantage HMO',
+        ehr_documents: JSON.parse(auth.ehr_documents || '[]'),
+        prior_tests_count: auth.prior_tests_count || 0,
+        family_history_count: auth.family_history_count || 0,
+        clinical_urgency: auth.clinical_urgency || 'routine'
+    };
+    
+    // Show the automation popup
+    document.getElementById('automation-popup').style.display = 'block';
+    
+    // Set current step based on auth data
+    currentAutomationStep = auth.current_step || 1;
+    
+    // Update progress bar
+    const progressPercent = (currentAutomationStep / 5) * 100;
+    document.getElementById('automation-progress-fill').style.width = progressPercent + '%';
+    document.getElementById('automation-progress-text').textContent = Math.round(progressPercent) + '% Complete';
+    
+    // Update step display
+    const currentStep = automationSteps[currentAutomationStep - 1];
+    if (currentStep) {
+        document.getElementById('current-step-title').textContent = currentStep.title;
+        document.getElementById('current-step-description').textContent = currentStep.description;
+        document.getElementById('current-step-icon').innerHTML = currentStep.icon;
+    }
+    
+    // Update status
+    document.getElementById('current-step-status').innerHTML = '<i class="fas fa-play"></i> In Progress';
+    
+    // Show persistent step history instead of just current step
+    const container = document.getElementById('step-content-container');
+    container.innerHTML = `
+        <div class="step-execution">
+            <h4>Automation Progress</h4>
+            <div class="execution-log">
+                <div class="log-entry">
+                    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+                    <span class="message">Automation is currently running on step ${currentAutomationStep} of 5</span>
+                </div>
+                <div class="log-entry">
+                    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+                    <span class="message">Patient: ${auth.patient_name} (${auth.patient_mrn})</span>
+                </div>
+                <div class="log-entry">
+                    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+                    <span class="message">Service: ${auth.service_type}</span>
+                </div>
+            </div>
+            
+            <div class="step-history">
+                <h5>Step History & Progress</h5>
+                <div class="step-history-container">
+                    ${automationSteps.map((step, index) => {
+                        const stepNumber = index + 1;
+                        const isCompleted = stepNumber < currentAutomationStep;
+                        const isCurrent = stepNumber === currentAutomationStep;
+                        const isPending = stepNumber > currentAutomationStep;
+                        
+                        return `
+                            <div class="step-history-item ${isCompleted ? 'completed' : isCurrent ? 'current' : 'pending'} ${isCompleted ? 'clickable' : ''}" 
+                                 ${isCompleted ? `onclick="inspectCompletedStep(${stepNumber}, '${step.title}')"` : ''}>
+                                <div class="step-header">
+                                    <div class="step-indicator">
+                                        <i class="fas ${isCompleted ? 'fa-check' : isCurrent ? 'fa-spinner fa-spin' : 'fa-circle'}"></i>
+                                    </div>
+                                    <div class="step-info">
+                                        <strong>Step ${stepNumber}: ${step.title}</strong>
+                                        <span class="step-status">
+                                            ${isCompleted ? 'Completed - Click to inspect' : isCurrent ? 'In Progress' : 'Pending'}
+                                        </span>
+                                    </div>
+                                    ${isCompleted ? '<i class="fas fa-chevron-right step-arrow"></i>' : ''}
+                                </div>
+                                
+                                ${isCompleted ? `
+                                    <div class="step-summary">
+                                        <div class="summary-item">
+                                            <i class="fas fa-clock"></i>
+                                            <span>Completed at ${new Date().toLocaleTimeString()}</span>
+                                        </div>
+                                        <div class="summary-item">
+                                            <i class="fas fa-check-circle"></i>
+                                            <span>All requirements met</span>
+                                        </div>
+                                    </div>
+                                ` : isCurrent ? `
+                                    <div class="step-summary">
+                                        <div class="summary-item">
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                            <span>Currently processing...</span>
+                                        </div>
+                                    </div>
+                                ` : `
+                                    <div class="step-summary">
+                                        <div class="summary-item">
+                                            <i class="fas fa-clock"></i>
+                                            <span>Waiting to start</span>
+                                        </div>
+                                    </div>
+                                `}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function sendClinicianMessage() {
+    // Simulate sending message via EPIC
+    alert('Message sent to Dr. Johnson via EPIC messaging system.');
+    closeClinicianModal();
+    
+    // Continue automation
+    approveCurrentStep();
+}
+
+async function debugData() {
+    try {
+        console.log('Debugging data...');
+        const response = await fetch('/api/debug/check-data');
+        const data = await response.json();
+        
+        console.log('Debug data:', data);
+        
+        if (data.success) {
+            alert(`Debug Info:\nTotal Records: ${data.total_records}\nStats: ${JSON.stringify(data.stats, null, 2)}`);
+        } else {
+            alert(`Debug Error: ${data.error}`);
+        }
+    } catch (error) {
+        console.error('Debug error:', error);
+        alert(`Debug Error: ${error.message}`);
+    }
 }
 
 // Close modals when clicking outside
 window.onclick = function(event) {
     const authModal = document.getElementById('auth-detail-modal');
     const stepModal = document.getElementById('step-detail-modal');
+    const automationModal = document.getElementById('automation-popup');
+    const clinicianModal = document.getElementById('clinician-message-modal');
     
     if (event.target === authModal) {
         closeModal();
     }
     if (event.target === stepModal) {
         closeStepModal();
+    }
+    if (event.target === automationModal) {
+        closeAutomationPopup();
+    }
+    if (event.target === clinicianModal) {
+        closeClinicianModal();
     }
 }
 </script>
