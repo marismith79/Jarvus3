@@ -417,10 +417,37 @@ class EnhancedInsuranceAnalysis:
         
         all_search_results = []
         
-        async with aiohttp.ClientSession() as session:
-            for query in search_queries:
+        # Run searches in smaller batches to avoid overwhelming the API
+        print(f"🚀 Starting GPT-5 searches for {len(search_queries)} queries...")
+        
+        # Take only the first 5 most important queries to avoid timeouts
+        important_queries = search_queries[:5]
+        print(f"📝 Using top {len(important_queries)} queries to avoid timeouts")
+        
+        # Create tasks for the important searches
+        search_tasks = []
+        for query in important_queries:
+            task = self._gpt5_search(None, query)  # session not needed for GPT-5 API
+            search_tasks.append(task)
+        
+        # Execute searches in parallel
+        try:
+            search_results_list = await asyncio.gather(*search_tasks, return_exceptions=True)
+            
+            # Process results, handling any exceptions
+            for i, result in enumerate(search_results_list):
+                if isinstance(result, Exception):
+                    print(f"❌ Error searching for query '{important_queries[i]}': {result}")
+                    continue
+                elif result:
+                    all_search_results.extend(result)
+                    
+        except Exception as e:
+            print(f"❌ Error in parallel search execution: {e}")
+            # Fallback to sequential search if parallel fails
+            for query in important_queries:
                 try:
-                    search_results = await self._gpt5_search(session, query)
+                    search_results = await self._gpt5_search(None, query)
                     all_search_results.extend(search_results)
                 except Exception as e:
                     print(f"Error searching for query '{query}': {e}")
@@ -455,29 +482,18 @@ class EnhancedInsuranceAnalysis:
         if is_medicare:
             # Medicare-specific queries targeting NCDs, LCDs, and LCAs
             queries.extend([
-                f"Medicare NCD {cpt_code} {service_type} National Coverage Determination",
-                f"Medicare LCD {cpt_code} {service_type} Local Coverage Determination",
-                f"Medicare LCA {cpt_code} {service_type} Local Coverage Article",
-                f"site:cms.gov Medicare Coverage Database {cpt_code} {service_type}",
-                f"site:cms.gov NCD LCD {service_type} {cpt_code}",
-                f"Medicare Coverage Database MCD {cpt_code} {service_type}",
-                f"Medicare medical necessity {cpt_code} {service_type} coverage policy"
+                f"Medicare NCD {cpt_code} {service_type}",
+                f"Medicare LCD {cpt_code} {service_type}",
+                f"site:cms.gov Medicare Coverage Database {cpt_code}",
+                f"Medicare medical necessity {cpt_code} {service_type}",
+                f"Medicare coverage policy {cpt_code}"
             ])
             
-            # Add MAC-specific queries if jurisdiction is known
+            # Add MAC-specific queries if jurisdiction is known (simplified)
             if mac_jurisdiction:
                 mac_name = mac_jurisdiction["name"]
-                jurisdiction_id = mac_jurisdiction["jurisdiction_id"]
-                states = ", ".join(mac_jurisdiction["states"])
-                
                 queries.extend([
-                    f"{mac_name} Medicare LCD {cpt_code} {service_type}",
-                    f"{mac_name} Medicare LCA {cpt_code} {service_type}",
-                    f"site:{mac_jurisdiction['website']} {cpt_code} {service_type}",
-                    f"Medicare LCD {jurisdiction_id} {cpt_code} {service_type}",
-                    f"Medicare LCA {jurisdiction_id} {cpt_code} {service_type}",
-                    f"Medicare {states} LCD {cpt_code} {service_type}",
-                    f"Medicare Administrative Contractor {mac_name} {cpt_code} {service_type}"
+                    f"{mac_name} Medicare {cpt_code} {service_type}"
                 ])
             
             # Add specific Medicare Advantage queries if applicable
@@ -498,7 +514,7 @@ class EnhancedInsuranceAnalysis:
         
         return queries
     
-    async def _gpt5_search(self, session: aiohttp.ClientSession, query: str) -> List[Dict]:
+    async def _gpt5_search(self, session: Optional[aiohttp.ClientSession], query: str) -> List[Dict]:
         """
         Perform actual GPT-5 search using the API with focus on Medicare documents.
         """
@@ -514,11 +530,16 @@ class EnhancedInsuranceAnalysis:
         try:
             print(f"🔍 Making GPT-5 search request for: {query}")
             
-            # Use the correct GPT-5 API format
-            response = self.client.responses.create(
-                model="gpt-5",
-                tools=[{"type": "web_search_preview"}],
-                input=search_prompt
+            # Use the correct GPT-5 API format with timeout
+            import asyncio
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.client.responses.create,
+                    model="gpt-5-nano",
+                    tools=[{"type": "web_search_preview"}],
+                    input=search_prompt
+                ),
+                timeout=120.0  # Increased timeout to 2 minutes
             )
             
             print(f"✅ GPT-5 search successful for: {query}")
@@ -527,6 +548,9 @@ class EnhancedInsuranceAnalysis:
             search_results = self._parse_gpt5_search_response(response, query)
             return search_results
                     
+        except asyncio.TimeoutError:
+            print(f"❌ GPT-5 search timed out for: {query}")
+            return self._get_fallback_search_results(query)
         except Exception as e:
             print(f"❌ Error in GPT-5 search: {e}")
             # Fallback to simulated results
@@ -579,10 +603,15 @@ class EnhancedInsuranceAnalysis:
         prompt = self._create_medicare_document_analysis_prompt(search_result)
         
         try:
-            # Use the correct GPT-5 API format
-            response = self.client.responses.create(
-                model="gpt-5",
-                input=prompt
+            # Use the correct GPT-5 API format with timeout
+            import asyncio
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.client.responses.create,
+                    model="gpt-5-nano",
+                    input=prompt
+                ),
+                timeout=30.0
             )
             
             content = response.output_text
@@ -605,6 +634,9 @@ class EnhancedInsuranceAnalysis:
             # Fallback to structured extraction
             return self._extract_document_info_from_text(content, search_result)
                 
+        except asyncio.TimeoutError:
+            print(f"GPT-5 document parsing timed out")
+            return self._get_fallback_document_info(search_result)
         except Exception as e:
             print(f"Error in GPT-5 document parsing: {e}")
             return self._get_fallback_document_info(search_result)
@@ -695,10 +727,15 @@ class EnhancedInsuranceAnalysis:
         )
         
         try:
-            # Use the correct GPT-5 API format
-            response = self.client.responses.create(
-                model="gpt-5",
-                input=prompt
+            # Use the correct GPT-5 API format with timeout
+            import asyncio
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.client.responses.create,
+                    model="gpt-5-nano",
+                    input=prompt
+                ),
+                timeout=30.0
             )
             
             content = response.output_text
@@ -707,6 +744,9 @@ class EnhancedInsuranceAnalysis:
             analysis_result = self._parse_analysis_response(content, cpt_code, insurance_provider, mac_jurisdiction)
             return analysis_result
                 
+        except asyncio.TimeoutError:
+            print(f"GPT-5 analysis timed out")
+            return self._get_fallback_analysis(cpt_code, insurance_provider, policy_documents, mac_jurisdiction)
         except Exception as e:
             print(f"Error in GPT-5 analysis: {e}")
             return self._get_fallback_analysis(cpt_code, insurance_provider, policy_documents, mac_jurisdiction)
@@ -867,16 +907,48 @@ class EnhancedInsuranceAnalysis:
         
         extracted_documents = []
         
-        async with aiohttp.ClientSession() as session:
-            for result in search_results:
-                if result.get('type') in ['policy_document', 'coverage_determination', 'ncd', 'lcd', 'lca']:
-                    try:
-                        extracted_doc = await self._parse_policy_document_with_gpt5(session, result)
-                        if extracted_doc:
-                            extracted_documents.append(extracted_doc)
-                    except Exception as e:
-                        print(f"Error parsing document {result.get('title', 'Unknown')}: {e}")
-                        continue
+        # Filter documents that need parsing
+        documents_to_parse = [
+            result for result in search_results 
+            if result.get('type') in ['policy_document', 'coverage_determination', 'ncd', 'lcd', 'lca']
+        ]
+        
+        if not documents_to_parse:
+            return extracted_documents
+        
+        # Only parse the top 3 most relevant documents to avoid timeouts
+        documents_to_parse = documents_to_parse[:3]
+        print(f"📄 Parsing top {len(documents_to_parse)} policy documents in parallel...")
+        
+        # Create tasks for document parsing
+        parse_tasks = []
+        for result in documents_to_parse:
+            task = self._parse_policy_document_with_gpt5(None, result)  # session not needed
+            parse_tasks.append(task)
+        
+        # Execute all parsing in parallel
+        try:
+            parse_results = await asyncio.gather(*parse_tasks, return_exceptions=True)
+            
+            # Process results, handling any exceptions
+            for i, result in enumerate(parse_results):
+                if isinstance(result, Exception):
+                    print(f"❌ Error parsing document '{documents_to_parse[i].get('title', 'Unknown')}': {result}")
+                    continue
+                elif result:
+                    extracted_documents.append(result)
+                    
+        except Exception as e:
+            print(f"❌ Error in parallel document parsing: {e}")
+            # Fallback to sequential parsing if parallel fails
+            for result in documents_to_parse:
+                try:
+                    extracted_doc = await self._parse_policy_document_with_gpt5(None, result)
+                    if extracted_doc:
+                        extracted_documents.append(extracted_doc)
+                except Exception as e:
+                    print(f"Error parsing document {result.get('title', 'Unknown')}: {e}")
+                    continue
         
         return extracted_documents
     
@@ -1082,10 +1154,15 @@ class EnhancedInsuranceAnalysis:
         """
         
         try:
-            # Use the correct GPT-5 API format
-            response = self.client.responses.create(
-                model="gpt-5",
-                input=prompt
+            # Use the correct GPT-5 API format with timeout
+            import asyncio
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.client.responses.create,
+                    model="gpt-5-nano",
+                    input=prompt
+                ),
+                timeout=30.0
             )
             
             content = response.output_text
@@ -1094,6 +1171,9 @@ class EnhancedInsuranceAnalysis:
             criteria_match = self._parse_criteria_response(content, requirements)
             return criteria_match
                 
+        except asyncio.TimeoutError:
+            print(f"GPT-5 criteria matching timed out")
+            return self._get_fallback_criteria_match(requirements, patient_context)
         except Exception as e:
             print(f"Error in GPT-5 criteria matching: {e}")
             return self._get_fallback_criteria_match(requirements, patient_context)
@@ -1160,10 +1240,15 @@ class EnhancedInsuranceAnalysis:
         """
         
         try:
-            # Use the correct GPT-5 API format
-            response = self.client.responses.create(
-                model="gpt-5",
-                input=prompt
+            # Use the correct GPT-5 API format with timeout
+            import asyncio
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.client.responses.create,
+                    model="gpt-5-nano",
+                    input=prompt
+                ),
+                timeout=30.0
             )
             
             content = response.output_text
@@ -1172,6 +1257,9 @@ class EnhancedInsuranceAnalysis:
             recommendations = self._parse_recommendations_response(content)
             return recommendations
                 
+        except asyncio.TimeoutError:
+            print(f"GPT-5 recommendations timed out")
+            return self._get_fallback_recommendations(coverage_info, patient_criteria_match)
         except Exception as e:
             print(f"Error in GPT-5 recommendations: {e}")
             return self._get_fallback_recommendations(coverage_info, patient_criteria_match)

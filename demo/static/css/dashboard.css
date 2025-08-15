@@ -2126,6 +2126,118 @@
     border-radius: 4px;
 }
 
+/* GPT-5 Search Animation Styles */
+.gpt5-search-animation {
+    margin: 20px 0;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    color: white;
+    text-align: center;
+}
+
+.search-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.search-icon {
+    font-size: 48px;
+    color: #fff;
+    animation: pulse 2s infinite;
+}
+
+.search-text h4 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.search-text p {
+    margin: 0 0 15px 0;
+    opacity: 0.9;
+    font-size: 14px;
+}
+
+.search-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border-radius: 50%;
+    animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.dot:nth-child(1) { animation-delay: -0.32s; }
+.dot:nth-child(2) { animation-delay: -0.16s; }
+.dot:nth-child(3) { animation-delay: 0s; }
+
+.search-details {
+    width: 100%;
+    max-width: 400px;
+}
+
+.search-query {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    font-size: 12px;
+    font-family: monospace;
+    word-break: break-all;
+}
+
+.search-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.search-progress .progress-bar {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.search-progress .progress-fill {
+    height: 100%;
+    background: #fff;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    animation: progress 2s infinite;
+}
+
+.search-progress .progress-text {
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 30px;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+@keyframes bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1); }
+}
+
+@keyframes progress {
+    0% { width: 0%; }
+    50% { width: 70%; }
+    100% { width: 100%; }
+}
+
 .step-status {
     color: #7f8c8d;
     font-size: 12px;
