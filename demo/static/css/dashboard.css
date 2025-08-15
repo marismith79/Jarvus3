@@ -31,141 +31,7 @@
     font-size: 16px;
 }
 
-.stats-summary {
-    display: flex;
-    gap: 20px;
-}
-
-.stat-item {
-    text-align: center;
-    padding: 10px 15px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    backdrop-filter: blur(10px);
-}
-
-.stat-number {
-    display: block;
-    font-size: 24px;
-    font-weight: 700;
-    margin-bottom: 5px;
-}
-
-.stat-label {
-    font-size: 12px;
-    opacity: 0.8;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-/* Workflow Overview */
-.workflow-overview {
-    margin-bottom: 30px;
-    padding: 25px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-}
-
-.workflow-overview h2 {
-    margin: 0 0 20px 0;
-    color: #333;
-    font-size: 20px;
-    font-weight: 600;
-}
-
-.workflow-steps {
-    display: flex;
-    gap: 15px;
-    overflow-x: auto;
-    padding: 10px 0;
-}
-
-.workflow-step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 200px;
-    padding: 20px 15px;
-    background: #f8f9fa;
-    border-radius: 10px;
-    border: 2px solid #e9ecef;
-    transition: all 0.3s ease;
-    position: relative;
-}
-
-.workflow-step:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-
-.workflow-step.active {
-    border-color: #007bff;
-    background: #e3f2fd;
-}
-
-.workflow-step.completed {
-    border-color: #28a745;
-    background: #f8fff9;
-}
-
-.step-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    background: #007bff;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 15px;
-    font-size: 20px;
-}
-
-.workflow-step.completed .step-icon {
-    background: #28a745;
-}
-
-.step-info h3 {
-    margin: 0 0 8px 0;
-    font-size: 14px;
-    font-weight: 600;
-    color: #333;
-    text-align: center;
-}
-
-.step-info p {
-    margin: 0;
-    font-size: 12px;
-    color: #666;
-    text-align: center;
-    line-height: 1.4;
-}
-
-.step-status {
-    margin-top: 10px;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.step-status:contains("Active") {
-    background: #fff3cd;
-    color: #856404;
-}
-
-.step-status:contains("Optional") {
-    background: #d1ecf1;
-    color: #0c5460;
-}
-
-.step-status:contains("Pending") {
-    background: #f8d7da;
-    color: #721c24;
-}
+ 
 
 /* Tab Navigation */
 .tab-navigation {
@@ -355,43 +221,8 @@
     cursor: pointer;
 }
 
-.patient-col {
-    width: 180px;
-}
-
-.patient-info .patient-name {
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 4px;
-}
-
-.patient-info .patient-mrn {
-    font-size: 12px;
-    color: #666;
-    margin-bottom: 4px;
-}
-
-.clinical-urgency {
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 10px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.clinical-urgency.urgent {
-    background: #fff3cd;
-    color: #856404;
-}
-
-.clinical-urgency.routine {
-    background: #d1ecf1;
-    color: #0c5460;
-}
-
 .service-col {
-    width: 200px;
+    width: 250px;
 }
 
 .service-info .service-type {
@@ -407,8 +238,8 @@
 }
 
 .cpt-col {
-    width: 100px;
-    text-align: center;
+    width: 120px;
+    text-align: left;
 }
 
 .cpt-code {
@@ -417,12 +248,12 @@
     color: #007bff;
     background: #f8f9fa;
     padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
+    /* border-radius: 4px; */
+    font-size: 14px;
 }
 
 .insurance-col {
-    width: 200px;
+    width: 220px;
 }
 
 .insurance-info .insurance-provider {
@@ -435,32 +266,6 @@
     font-size: 12px;
     color: #666;
     line-height: 1.3;
-}
-
-.progress-col {
-    width: 120px;
-}
-
-.progress-bar {
-    width: 100%;
-    height: 8px;
-    background: #e9ecef;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 5px;
-}
-
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #28a745, #20c997);
-    transition: width 0.3s ease;
-}
-
-.progress-text {
-    font-size: 11px;
-    color: #666;
-    text-align: center;
-    font-weight: 500;
 }
 
 .current-step-col {
@@ -502,7 +307,7 @@
 }
 
 .status-col {
-    width: 120px;
+    width: 140px;
 }
 
 .status-badge {
@@ -1045,9 +850,7 @@
         text-align: center;
     }
     
-    .stats-summary {
-        justify-content: center;
-    }
+    
     
     .filter-bar {
         flex-direction: column;
@@ -1098,15 +901,7 @@
         justify-content: flex-start;
     }
     
-    .stats-summary {
-        flex-wrap: wrap;
-        gap: 10px;
-    }
     
-    .stat-item {
-        flex: 1;
-        min-width: 80px;
-    }
 }
 
 /* Automation Popup Styles */
@@ -1133,7 +928,7 @@
     border-radius: 8px;
 }
 
-.automation-progress .progress-bar {
+.automation-progress {
     width: 100%;
     height: 12px;
     background: #e9ecef;
@@ -2291,28 +2086,11 @@
     color: #bdc3c7;
 }
 
-/* Clickable Step Styles */
-.progress-step.clickable {
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.progress-step.clickable:hover {
-    background-color: #e3f2fd;
-    border-left-color: #2196f3;
-    transform: translateX(5px);
-}
-
 .step-arrow {
     color: #bdc3c7;
     font-size: 12px;
     margin-left: auto;
     transition: all 0.3s ease;
-}
-
-.progress-step.clickable:hover .step-arrow {
-    color: #2196f3;
-    transform: translateX(3px);
 }
 
 /* Step Inspection Styles */

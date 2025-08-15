@@ -37,6 +37,7 @@ workflows = [
 next_workflow_id = 3
 
 @app.route('/')
+@app.route('/dashboard')
 def dashboard():
     """Main dashboard page"""
     try:
@@ -500,4 +501,5 @@ def update_workflow(workflow_id: int):
     return jsonify({"error": "Workflow not found"}), 404
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.getenv('PORT', '5001'))
+    app.run(debug=True, host='0.0.0.0', port=port)

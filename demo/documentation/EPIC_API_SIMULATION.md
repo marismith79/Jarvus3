@@ -144,7 +144,7 @@ This will test all endpoints and verify that data is being retrieved correctly f
 To reset the database with the new schema:
 
 ```bash
-curl -X POST http://localhost:5000/api/reset-database
+curl -X POST http://localhost:5001/api/reset-database
 ```
 
 This will:

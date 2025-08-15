@@ -12,90 +12,6 @@
 
 {% block content %}
 <div class="work-queue-container">
-    <!-- Header Section -->
-    <div class="queue-header">
-        <div class="header-left">
-            <h1><i class="fas fa-robot"></i> AI Agent Prior Authorization Dashboard</h1>
-            <p class="subtitle">Automated prior authorization processing with human oversight</p>
-        </div>
-        <div class="header-right">
-            <div class="stats-summary">
-                <div class="stat-item">
-                    <span class="stat-number" id="total-count">0</span>
-                    <span class="stat-label">Total</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number" id="automated-count">0</span>
-                    <span class="stat-label">Automated</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number" id="human-review-count">0</span>
-                    <span class="stat-label">Human Review</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number" id="completed-count">0</span>
-                    <span class="stat-label">Completed</span>
-                </div>
-                </div>
-        </div>
-    </div>
-
-    <!-- Automation Workflow Overview -->
-    <div class="workflow-overview">
-        <h2>Automation Workflow</h2>
-        <div class="workflow-steps">
-            <div class="workflow-step" data-step="1">
-                <div class="step-icon">
-                    <i class="fas fa-search"></i>
-                </div>
-                <div class="step-info">
-                    <h3>Coverage Determination</h3>
-                    <p>Check if CPT code is covered by insurance plan</p>
-                </div>
-                <!-- <div class="step-status" id="step-1-status">Optional</div> -->
-            </div>
-            <div class="workflow-step" data-step="2">
-                <div class="step-icon">
-                    <i class="fas fa-file-medical"></i>
-                </div>
-                <div class="step-info">
-                    <h3>Requirements Extraction</h3>
-                    <p>Extract clinical requirements and required documents</p>
-                </div>
-                <!-- <div class="step-status" id="step-2-status">Active</div> -->
-            </div>
-            <div class="workflow-step" data-step="3">
-                <div class="step-icon">
-                    <i class="fas fa-clipboard-check"></i>
-                </div>
-                <div class="step-info">
-                    <h3>Screening</h3>
-                    <p>Verify EHR data completeness and procedure appropriateness</p>
-                </div>
-                <!-- <div class="step-status" id="step-3-status">Pending</div> -->
-            </div>
-            <div class="workflow-step" data-step="4">
-                <div class="step-icon">
-                    <i class="fas fa-database"></i>
-                </div>
-                <div class="step-info">
-                    <h3>Data Extraction</h3>
-                    <p>Extract relevant data from EHR with citations</p>
-                </div>
-                <!-- <div class="step-status" id="step-4-status">Pending</div> -->
-            </div>
-            <div class="workflow-step" data-step="5">
-                <div class="step-icon">
-                    <i class="fas fa-paper-plane"></i>
-                </div>
-                <div class="step-info">
-                    <h3>Form Submission</h3>
-                    <p>Fill form and submit after human review</p>
-                </div>
-                <!-- <div class="step-status" id="step-5-status">Pending</div> -->
-            </div>
-        </div>
-    </div>
 
     <!-- Tab Navigation -->
     <div class="tab-navigation">
@@ -130,7 +46,7 @@
     <div class="filter-bar">
         <div class="search-box">
             <i class="fas fa-search"></i>
-            <input type="text" id="search-input" placeholder="Search by patient name, MRN, or service type...">
+            <input type="text" id="search-input" placeholder="Search by CPT code, service type, or insurance...">
         </div>
         <div class="filter-controls">
             <select id="provider-filter">
@@ -167,20 +83,15 @@
                     <th class="checkbox-col">
                         <input type="checkbox" id="select-all">
                     </th>
-                    <th class="patient-col sortable" data-sort="patient_name">
-                        Patient <i class="fas fa-sort"></i>
+                    <th class="cpt-col sortable" data-sort="cpt_code">
+                        CPT Code <i class="fas fa-sort"></i>
                     </th>
                     <th class="service-col sortable" data-sort="service_type">
                         Service Type <i class="fas fa-sort"></i>
                     </th>
-                    <th class="cpt-col sortable" data-sort="cpt_code">
-                        CPT Code <i class="fas fa-sort"></i>
-                    </th>
                     <th class="insurance-col sortable" data-sort="insurance_provider">
                         Insurance <i class="fas fa-sort"></i>
                     </th>
-                    <th class="progress-col">Progress</th>
-                    <th class="current-step-col">Current Step</th>
                     <th class="status-col sortable" data-sort="status">
                         Status <i class="fas fa-sort"></i>
                     </th>
@@ -277,14 +188,6 @@
         </div>
         <div class="modal-body">
             <div class="automation-container">
-                <!-- Progress Bar -->
-                <div class="automation-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="automation-progress-fill"></div>
-                    </div>
-                    <div class="progress-text" id="automation-progress-text">0% Complete</div>
-                </div>
-
                 <!-- Current Step Display -->
                 <div class="current-step-display">
                     <div class="step-header">

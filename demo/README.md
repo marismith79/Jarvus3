@@ -82,7 +82,7 @@ This demo showcases an AI agent that automates the prior authorization process f
 
 2. **Install dependencies**
    ```bash
-   pip install -r requirements.txt
+   pip install -r demo/requirements.txt
    ```
 
 3. **Set up GPT-5 API key** (recommended for full functionality)
@@ -106,7 +106,7 @@ This demo showcases an AI agent that automates the prior authorization process f
    ```
 
 6. **Access the demo**
-   - Open your browser and go to `http://localhost:5000`
+   - Open your browser and go to `http://localhost:5001`
    - The dashboard will load with mock prior authorization data
    - Use the enhanced insurance analysis with real GPT-5 search mode
 
@@ -219,7 +219,7 @@ This demo showcases an AI agent that automates the prior authorization process f
 1. **Application won't start**
    - Check Python version (3.8+ required)
    - Verify all dependencies are installed
-   - Check port 5000 is available
+   - Check port 5001 is available
 
 2. **No data appears**
    - Refresh the page
