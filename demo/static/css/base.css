@@ -62,7 +62,10 @@ body {
 .nav-link:hover { color: var(--brand-400) !important; }
 
 /* Main Content */
-.main-content { padding: 0; min-height: calc(100vh - 76px); }
+.main-content {
+    padding: 0;
+    min-height: calc(100vh - 76px);
+}
 
 /* Card Styles */
 .card {
