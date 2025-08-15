@@ -389,8 +389,8 @@ const automationSteps = [
     },
     {
         id: 5,
-        title: "Form Completion",
-        description: "Filling out Medicaid Husky form for genetic testing",
+        title: "HUSKY Form Completion",
+        description: "Filling out HUSKY Health Genetic Testing Prior Authorization form",
         icon: "fas fa-paper-plane",
         content: "form"
     }
@@ -629,7 +629,7 @@ function getStepName(step) {
         2: 'Requirements',
         3: 'Screening',
         4: 'Data Extraction',
-        5: 'Submission'
+        5: 'HUSKY Form'
     };
     return stepNames[step] || 'Unknown';
 }
@@ -1092,98 +1092,128 @@ async function executeDataExtraction() {
     
     await streamText(content, `
         <div class="data-extraction">
-            <h4>Step 4: Intelligent Data Extraction from EHR</h4>
+            <h4>Step 4: HUSKY Form Data Extraction from EHR</h4>
             <div class="result-card">
                 <div class="extraction-process">
-                    <h5>Extracting Data from Clinical Documents:</h5>
+                    <h5>Extracting HUSKY Form Required Data from Clinical Documents:</h5>
                     
                     <div class="extraction-source">
-                        <h6><i class="fas fa-file-medical"></i> Pathology Report Analysis</h6>
+                        <h6><i class="fas fa-user"></i> Member Information Extraction</h6>
                         <div class="extracted-data">
                             <div class="data-item">
-                                <strong>Diagnosis:</strong> ${automationData.diagnosis}
+                                <strong>Member ID:</strong> ${automationData.patient_mrn}
+                                <div class="data-source">Source: EPIC Patient Demographics</div>
                             </div>
                             <div class="data-item">
-                                <strong>Histology:</strong> Adenocarcinoma
+                                <strong>Date of Birth:</strong> ${automationData.patient_dob}
+                                <div class="data-source">Source: EPIC Patient Demographics</div>
                             </div>
                             <div class="data-item">
-                                <strong>Grade:</strong> G3
+                                <strong>Member Name:</strong> ${automationData.patient_name}
+                                <div class="data-source">Source: EPIC Patient Demographics</div>
                             </div>
                             <div class="data-item">
-                                <strong>Tumor Size:</strong> 60mm
-                            </div>
-                            <div class="data-item">
-                                <strong>Stage:</strong> ${automationData.stage || 'IV'}
-                            </div>
-                            <div class="data-item">
-                                <strong>Specimen:</strong> Excisional biopsy, 30% tumor purity
+                                <strong>Address:</strong> 123 Main Street, Hartford, CT 06106
+                                <div class="data-source">Source: EPIC Patient Demographics</div>
                             </div>
                         </div>
                     </div>
                     
                     <div class="extraction-source">
-                        <h6><i class="fas fa-user-md"></i> Clinical Notes Analysis</h6>
-                        <div class="extracted-data">
-                            <div class="data-item">
-                                <strong>ECOG Performance Status:</strong> 1
-                            </div>
-                            <div class="data-item">
-                                <strong>Treatment History:</strong> Pembrolizumab ongoing
-                            </div>
-                            <div class="data-item">
-                                <strong>Clinical Rationale:</strong> "Molecular profiling ordered for treatment selection"
-                            </div>
-                            <div class="data-item">
-                                <strong>Family History:</strong> ${automationData.family_history_count || 0} relevant family members
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="extraction-source">
-                        <h6><i class="fas fa-dna"></i> Molecular Testing Data</h6>
+                        <h6><i class="fas fa-flask"></i> Requested Testing Information</h6>
                         <div class="extracted-data">
                             <div class="data-item">
                                 <strong>Test Name:</strong> ${automationData.service_type}
+                                <div class="data-source">Source: Molecular Testing Order</div>
                             </div>
                             <div class="data-item">
-                                <strong>CPT Code:</strong> ${automationData.cpt_code}
+                                <strong>Date of Service:</strong> ${new Date().toISOString().split('T')[0]}
+                                <div class="data-source">Source: Current Date</div>
                             </div>
                             <div class="data-item">
-                                <strong>Methodology:</strong> WES + RNA
+                                <strong>Type of Test:</strong> Gene panel
+                                <div class="data-source">Source: Molecular Testing Order</div>
                             </div>
                             <div class="data-item">
-                                <strong>Genes Analyzed:</strong> 334 genes
+                                <strong>Gene Mutation Tested For:</strong> Comprehensive genomic profiling (334 genes)
+                                <div class="data-source">Source: Molecular Testing Order</div>
                             </div>
                             <div class="data-item">
-                                <strong>Lab:</strong> GenomeDx Clinical (CLIA: 06D2223334)
+                                <strong>ICD-10 Codes:</strong> ${automationData.icd10 || 'C34.90'}
+                                <div class="data-source">Source: Pathology Report</div>
+                            </div>
+                            <div class="data-item">
+                                <strong>CPT Requests:</strong> ${automationData.cpt_code} (1 unit)
+                                <div class="data-source">Source: Molecular Testing Order</div>
                             </div>
                         </div>
                     </div>
                     
                     <div class="extraction-source">
-                        <h6><i class="fas fa-flask"></i> Lab Results Integration</h6>
+                        <h6><i class="fas fa-file-medical"></i> Clinical Documentation</h6>
                         <div class="extracted-data">
                             <div class="data-item">
-                                <strong>Hemoglobin:</strong> 10.9 g/dL
+                                <strong>Ordering Provider:</strong> Dr. Jordan Rivera, Oncology
+                                <div class="data-source">Source: Oncology Consultation Note</div>
                             </div>
                             <div class="data-item">
-                                <strong>Platelets:</strong> 303 K/uL
+                                <strong>Genetic Counseling:</strong> ${automationData.ehr_documents.includes('Genetic Counseling Note') ? 'Completed' : 'Not required for cancer testing'}
+                                <div class="data-source">Source: ${automationData.ehr_documents.includes('Genetic Counseling Note') ? 'Genetic Counseling Note' : 'Clinical Assessment'}</div>
                             </div>
                             <div class="data-item">
-                                <strong>Creatinine:</strong> 1.2 mg/dL
+                                <strong>Clinical Indication:</strong> ${automationData.diagnosis} - Stage ${automationData.stage || 'IV'}
+                                <div class="data-source">Source: Pathology Report</div>
                             </div>
                             <div class="data-item">
-                                <strong>Albumin:</strong> 4.31 g/dL
+                                <strong>Treatment History:</strong> Pembrolizumab ongoing
+                                <div class="data-source">Source: Oncology Consultation Note</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="extraction-source">
+                        <h6><i class="fas fa-history"></i> Personal & Family History</h6>
+                        <div class="extracted-data">
+                            <div class="data-item">
+                                <strong>Personal History:</strong> ${automationData.diagnosis} diagnosed at age ${automationData.age_at_diagnosis || '65'}
+                                <div class="data-source">Source: Oncology Consultation Note</div>
+                            </div>
+                            <div class="data-item">
+                                <strong>Family History:</strong> ${automationData.family_history_count > 0 ? 'Mother: breast cancer at age 45; Sister: breast cancer at age 52' : 'No relevant family history'}
+                                <div class="data-source">Source: Family History Documentation</div>
+                            </div>
+                            <div class="data-item">
+                                <strong>Prior Genetic Testing:</strong> ${automationData.prior_tests_count > 0 ? `${automationData.prior_tests_count} previous tests performed` : 'No prior comprehensive genetic testing'}
+                                <div class="data-source">Source: Molecular Testing History</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="extraction-source">
+                        <h6><i class="fas fa-hospital"></i> Provider Information</h6>
+                        <div class="extracted-data">
+                            <div class="data-item">
+                                <strong>Billing Provider:</strong> Hartford Hospital (Medicaid #123456)
+                                <div class="data-source">Source: Provider Database</div>
+                            </div>
+                            <div class="data-item">
+                                <strong>Ordering Provider:</strong> Dr. Jordan Rivera, Oncology (Medicaid #789012)
+                                <div class="data-source">Source: Provider Database</div>
+                            </div>
+                            <div class="data-item">
+                                <strong>Provider Address:</strong> 80 Seymour Street, Hartford, CT 06102
+                                <div class="data-source">Source: Provider Database</div>
                             </div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="extraction-summary">
-                    <h5><i class="fas fa-check-circle"></i> Data Extraction Complete</h5>
-                    <p><strong>Summary:</strong> Successfully extracted all required clinical data from EHR sources with proper citations.</p>
-                    <p><strong>Data Quality:</strong> All fields populated with verified clinical information.</p>
-                    <p><strong>Next Step:</strong> Form completion with extracted data.</p>
+                    <h5><i class="fas fa-check-circle"></i> HUSKY Form Data Extraction Complete</h5>
+                    <p><strong>Summary:</strong> Successfully extracted all required data for HUSKY Health Genetic Testing Prior Authorization form.</p>
+                    <p><strong>Data Quality:</strong> All required fields populated with verified clinical information and proper citations.</p>
+                    <p><strong>Form Sections Covered:</strong> Member Information, Requested Testing, Clinical Documentation, Personal/Family History, Provider Information</p>
+                    <p><strong>Next Step:</strong> HUSKY form completion with extracted data.</p>
                 </div>
             </div>
         </div>
@@ -1194,6 +1224,7 @@ async function executeDataExtraction() {
         data_extracted: true,
         all_fields_populated: true,
         citations_provided: true,
+        husky_form_ready: true,
         action: 'proceed_to_form'
     };
     
@@ -1205,19 +1236,15 @@ async function executeFormCompletion() {
     
     await streamText(content, `
         <div class="form-completion">
-            <h4>Step 5: Prior Authorization Form Completion</h4>
+            <h4>Step 5: HUSKY Health Genetic Testing Prior Authorization Form</h4>
             <div class="result-card">
                 <div class="form-preview">
-                    <h5>Medicare Prior Authorization Form (Medicare Advantage HMO)</h5>
+                    <h5>HUSKY Health Genetic Testing Prior Authorization Request</h5>
                     
                     <div class="form-section">
-                        <h6>Patient Information</h6>
+                        <h6><i class="fas fa-user"></i> Member Information</h6>
                         <div class="form-field">
-                            <label>Patient Name:</label>
-                            <span>${automationData.patient_name}</span>
-                        </div>
-                        <div class="form-field">
-                            <label>MRN:</label>
+                            <label>Member ID:</label>
                             <span>${automationData.patient_mrn}</span>
                         </div>
                         <div class="form-field">
@@ -1225,64 +1252,148 @@ async function executeFormCompletion() {
                             <span>${automationData.patient_dob}</span>
                         </div>
                         <div class="form-field">
-                            <label>Insurance:</label>
-                            <span>${automationData.insurance_provider} (${automationData.insurance_plan})</span>
+                            <label>Member Name:</label>
+                            <span>${automationData.patient_name}</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Address:</label>
+                            <span>123 Main Street, Hartford, CT 06106</span>
                         </div>
                     </div>
                     
                     <div class="form-section">
-                        <h6>Service Request</h6>
+                        <h6><i class="fas fa-flask"></i> Requested Testing</h6>
                         <div class="form-field">
-                            <label>Service:</label>
+                            <label>Test Name:</label>
                             <span>${automationData.service_type}</span>
                         </div>
                         <div class="form-field">
-                            <label>CPT Code:</label>
-                            <span>${automationData.cpt_code}</span>
+                            <label>Date of Service:</label>
+                            <span>${new Date().toISOString().split('T')[0]}</span>
                         </div>
                         <div class="form-field">
-                            <label>Diagnosis:</label>
-                            <span>${automationData.diagnosis} (ICD-10: ${automationData.icd10 || 'C34.90'})</span>
+                            <label>Type of Test:</label>
+                            <span>Gene panel</span>
                         </div>
                         <div class="form-field">
-                            <label>Clinical Rationale:</label>
-                            <span>Molecular profiling for treatment selection in advanced cancer</span>
-                        </div>
-                    </div>
-                    
-                    <div class="form-section">
-                        <h6>Clinical Documentation</h6>
-                        <div class="form-field">
-                            <label>Pathology Report:</label>
-                            <span>✓ Attached (Adenocarcinoma, Stage ${automationData.stage || 'IV'})</span>
+                            <label>Gene Mutation Tested For:</label>
+                            <span>Comprehensive genomic profiling (334 genes)</span>
                         </div>
                         <div class="form-field">
-                            <label>Oncology Consultation:</label>
-                            <span>✓ Attached (Dr. Jordan Rivera)</span>
+                            <label>ICD-10 Codes:</label>
+                            <span>${automationData.icd10 || 'C34.90'} - ${automationData.diagnosis}</span>
                         </div>
                         <div class="form-field">
-                            <label>Molecular Testing Order:</label>
-                            <span>✓ Attached (${automationData.service_type})</span>
-                        </div>
-                        <div class="form-field">
-                            <label>Genetic Counseling:</label>
-                            <span>${automationData.ehr_documents.includes('Genetic Counseling Note') ? '✓ Attached' : 'Not required'}</span>
+                            <label>CPT Requests:</label>
+                            <span>${automationData.cpt_code} (1 unit)</span>
                         </div>
                     </div>
                     
                     <div class="form-section">
-                        <h6>Coverage Criteria</h6>
+                        <h6><i class="fas fa-question-circle"></i> Form Questions</h6>
                         <div class="form-field">
-                            <label>NCD 90.2 Criteria Met:</label>
-                            <span>✓ Yes - Advanced cancer, no prior comprehensive NGS</span>
+                            <label>Ordered by Qualified Clinician:</label>
+                            <span>Yes - Dr. Jordan Rivera, Oncology</span>
                         </div>
                         <div class="form-field">
-                            <label>FDA Coverage:</label>
-                            <span>✓ Yes - CPT ${automationData.cpt_code} has companion diagnostic</span>
+                            <label>Genetic Counseling Pre/Post:</label>
+                            <span>${automationData.ehr_documents.includes('Genetic Counseling Note') ? 'Yes' : 'No - Not required for cancer testing'}</span>
                         </div>
                         <div class="form-field">
-                            <label>Clinical Indication:</label>
-                            <span>✓ Yes - Treatment selection for advanced cancer</span>
+                            <label>Mutation Accepted by Societies:</label>
+                            <span>Yes - NCCN guidelines support testing</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Diagnosable by Non-Genetic Means:</label>
+                            <span>No - Molecular profiling required for treatment selection</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Test Performed Previously:</label>
+                            <span>${automationData.prior_tests_count > 0 ? 'Yes' : 'No'}</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Specific Reason and Guidelines:</label>
+                            <span>NCCN Guidelines v2.2024 - Comprehensive genomic profiling for treatment selection in advanced ${automationData.diagnosis}</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Evaluation Studies List:</label>
+                            <span>Pathology report, oncology consultation, molecular testing order attached</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h6><i class="fas fa-stethoscope"></i> Clinical Presentation</h6>
+                        <div class="form-field">
+                            <label>Has Clinical Features of Mutation:</label>
+                            <span>Yes - ${automationData.diagnosis} with advanced stage</span>
+                        </div>
+                        <div class="form-field">
+                            <label>At Direct Risk of Inheriting:</label>
+                            <span>No - Somatic testing for treatment selection</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Prospective Parent High Risk Guides Reproductive Decisions:</label>
+                            <span>No - Not applicable for cancer treatment</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h6><i class="fas fa-history"></i> History</h6>
+                        <div class="form-field">
+                            <label>Less Intensive Genetic Testing Completed:</label>
+                            <span>${automationData.prior_tests_count > 0 ? 'Yes' : 'No'}</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Personal History of Diagnosis:</label>
+                            <span>Yes - ${automationData.diagnosis} diagnosed at age ${automationData.age_at_diagnosis || '65'}</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Family History of Diagnosis:</label>
+                            <span>${automationData.family_history_count > 0 ? 'Yes' : 'No'}</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Partner History of Disorder or Mutation:</label>
+                            <span>No</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Previous Child History of Disorder or Mutation:</label>
+                            <span>No</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h6><i class="fas fa-heartbeat"></i> Medical Management</h6>
+                        <div class="form-field">
+                            <label>Material Impact on Treatment Beyond Typical:</label>
+                            <span>Yes - Molecular profiling guides targeted therapy selection</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Improves Health Outcomes:</label>
+                            <span>Yes - Targeted therapy based on molecular profile improves survival</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Disease Treatable or Preventable:</label>
+                            <span>Yes - Multiple targeted therapies available for identified mutations</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Reduces Morbidity or Mortality:</label>
+                            <span>Yes</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Avoids or Supplants Additional Testing:</label>
+                            <span>Yes - Comprehensive panel eliminates need for multiple individual tests</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h6><i class="fas fa-hospital"></i> Provider Information</h6>
+                        <div class="form-field">
+                            <label>Billing Provider:</label>
+                            <span>Hartford Hospital (Medicaid #123456)</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Ordering Provider:</label>
+                            <span>Dr. Jordan Rivera, Oncology (Medicaid #789012)</span>
                         </div>
                     </div>
                 </div>
@@ -1291,23 +1402,23 @@ async function executeFormCompletion() {
                     <h5><i class="fas fa-check-circle"></i> Form Validation</h5>
                     <div class="validation-item success">
                         <i class="fas fa-check"></i>
-                        <span>All required fields completed</span>
+                        <span>All required fields completed per HUSKY schema</span>
                     </div>
                     <div class="validation-item success">
                         <i class="fas fa-check"></i>
-                        <span>Clinical documentation attached</span>
+                        <span>Clinical documentation verified</span>
                     </div>
                     <div class="validation-item success">
                         <i class="fas fa-check"></i>
-                        <span>Coverage criteria verified</span>
+                        <span>ICD-10 codes validated</span>
                     </div>
                     <div class="validation-item success">
                         <i class="fas fa-check"></i>
-                        <span>Diagnosis codes validated</span>
+                        <span>CPT codes verified</span>
                     </div>
                     <div class="validation-item success">
                         <i class="fas fa-check"></i>
-                        <span>Prior authorization form ready for submission</span>
+                        <span>HUSKY Health prior authorization form ready for submission</span>
                     </div>
                 </div>
             </div>
@@ -1357,8 +1468,8 @@ async function moveToNextStep() {
                             <li>✓ Coverage determination completed</li>
                             <li>✓ Insurance requirements identified</li>
                             <li>✓ Screening passed - all documentation complete</li>
-                            <li>✓ EHR data extracted with citations</li>
-                            <li>✓ Form populated and ready for review</li>
+                            <li>✓ HUSKY form data extracted with citations</li>
+                            <li>✓ HUSKY Health prior authorization form populated and ready for review</li>
                         </ul>
                     </div>
             </div>
@@ -1985,59 +2096,115 @@ function inspectCompletedStep(stepNumber, stepTitle) {
         case 5:
             stepContent = `
                 <div class="step-inspection">
-                    <h3>Step 5: Form Completion - Completed</h3>
+                    <h3>Step 5: HUSKY Form Completion - Completed</h3>
                     <div class="step-details">
                         <div class="detail-section">
-                            <h4>Medicaid Husky Form</h4>
+                            <h4>HUSKY Health Genetic Testing Prior Authorization Form</h4>
                             <div class="form-preview">
                                 <div class="form-section">
-                                    <h5>Patient Information</h5>
+                                    <h5>Member Information</h5>
                                     <div class="form-field">
-                                        <label>Patient Name:</label>
-                                        <span>${automationData.patient_name}</span>
+                                        <label>Member ID:</label>
+                                        <span>${automationData.patient_mrn}</span>
                                     </div>
                                     <div class="form-field">
                                         <label>Date of Birth:</label>
                                         <span>${automationData.patient_dob}</span>
                                     </div>
                                     <div class="form-field">
-                                        <label>MRN:</label>
-                                        <span>${automationData.patient_mrn}</span>
+                                        <label>Member Name:</label>
+                                        <span>${automationData.patient_name}</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>Address:</label>
+                                        <span>123 Main Street, Hartford, CT 06106</span>
                                     </div>
                                 </div>
                                 
                                 <div class="form-section">
-                                    <h5>Service Information</h5>
+                                    <h5>Requested Testing</h5>
                                     <div class="form-field">
-                                        <label>Service Type:</label>
+                                        <label>Test Name:</label>
                                         <span>${automationData.service_type}</span>
                                     </div>
                                     <div class="form-field">
-                                        <label>CPT Code:</label>
-                                        <span>${automationData.cpt_code}</span>
+                                        <label>Date of Service:</label>
+                                        <span>${new Date().toISOString().split('T')[0]}</span>
                                     </div>
                                     <div class="form-field">
-                                        <label>Diagnosis:</label>
-                                        <span>${automationData.diagnosis}</span>
+                                        <label>Type of Test:</label>
+                                        <span>Gene panel</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>ICD-10 Codes:</label>
+                                        <span>${automationData.icd10 || 'C34.90'}</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>CPT Requests:</label>
+                                        <span>${automationData.cpt_code} (1 unit)</span>
                                     </div>
                                 </div>
                                 
                                 <div class="form-section">
-                                    <h5>Insurance Information</h5>
+                                    <h5>Form Questions</h5>
                                     <div class="form-field">
-                                        <label>Insurance Provider:</label>
-                                        <span>${automationData.insurance_provider}</span>
+                                        <label>Ordered by Qualified Clinician:</label>
+                                        <span>Yes - Dr. Jordan Rivera, Oncology</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>Genetic Counseling Pre/Post:</label>
+                                        <span>${automationData.ehr_documents.includes('Genetic Counseling Note') ? 'Yes' : 'No - Not required for cancer testing'}</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>Mutation Accepted by Societies:</label>
+                                        <span>Yes - NCCN guidelines support testing</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>Specific Reason and Guidelines:</label>
+                                        <span>NCCN Guidelines v2.2024 - Comprehensive genomic profiling for treatment selection</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-section">
+                                    <h5>Clinical Presentation</h5>
+                                    <div class="form-field">
+                                        <label>Has Clinical Features of Mutation:</label>
+                                        <span>Yes - ${automationData.diagnosis} with advanced stage</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>At Direct Risk of Inheriting:</label>
+                                        <span>No - Somatic testing for treatment selection</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-section">
+                                    <h5>Medical Management</h5>
+                                    <div class="form-field">
+                                        <label>Material Impact on Treatment:</label>
+                                        <span>Yes - Molecular profiling guides targeted therapy selection</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>Improves Health Outcomes:</label>
+                                        <span>Yes - Targeted therapy based on molecular profile improves survival</span>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>Reduces Morbidity or Mortality:</label>
+                                        <span>Yes</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="detail-section">
-                            <h4>Form Validation</h4>
+                            <h4>HUSKY Form Validation</h4>
                             <div class="validation-results">
                                 <div class="validation-item success">
                                     <i class="fas fa-check-circle"></i>
-                                    <span>Patient demographics verified</span>
+                                    <span>All required fields completed per HUSKY schema</span>
+                                </div>
+                                <div class="validation-item success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Member information verified</span>
                                 </div>
                                 <div class="validation-item success">
                                     <i class="fas fa-check-circle"></i>
@@ -2045,11 +2212,15 @@ function inspectCompletedStep(stepNumber, stepTitle) {
                                 </div>
                                 <div class="validation-item success">
                                     <i class="fas fa-check-circle"></i>
-                                    <span>Insurance information verified</span>
+                                    <span>ICD-10 and CPT codes validated</span>
                                 </div>
                                 <div class="validation-item success">
                                     <i class="fas fa-check-circle"></i>
-                                    <span>Genetic counseling note attached</span>
+                                    <span>Provider information verified</span>
+                                </div>
+                                <div class="validation-item success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>HUSKY Health prior authorization form ready for submission</span>
                                 </div>
                             </div>
                         </div>
