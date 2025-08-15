@@ -2,9 +2,11 @@
 from flask import Flask, render_template, jsonify, request
 from mock_ehr_system import MockEHRSystem
 from gpt5_integration import GPT5Integration
+from enhanced_insurance_analysis import enhanced_insurance_analyzer
 import json
 import sys
 import os
+import asyncio
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from database import db
 
@@ -325,6 +327,118 @@ def reset_database():
 @app.route('/settings')
 def settings():
     return render_template('settings.html')
+
+# Enhanced Insurance Analysis Endpoint
+@app.route('/api/prior-auths/<int:auth_id>/analyze-insurance', methods=['POST'])
+def analyze_insurance_coverage_and_requirements(auth_id):
+    """Analyze insurance coverage and requirements using GPT-5 search mode"""
+    try:
+        # Get prior authorization data
+        prior_auths = db.get_prior_auths_by_status('all')
+        auth = next((pa for pa in prior_auths if pa['id'] == auth_id), None)
+        
+        if not auth:
+            return jsonify({'error': 'Prior authorization not found'}), 404
+        
+        # Extract data for analysis
+        cpt_code = auth.get('cpt_code', '')
+        insurance_provider = auth.get('payer', '')
+        service_type = 'genetic testing'  # Default, could be extracted from auth data
+        
+        # Get patient context from EHR
+        patient_mrn = auth.get('patient_mrn', '')
+        patient_context = {}
+        patient_address = None
+        
+        if patient_mrn:
+            try:
+                ehr_data = ehr_system.get_patient_data(patient_mrn)
+                
+                # Extract patient address from EHR data
+                if isinstance(ehr_data, dict) and 'patient_admin' in ehr_data:
+                    patient_address = ehr_data['patient_admin'].get('address')
+                
+                patient_context = {
+                    'has_genetic_counseling': 'genetic counseling' in str(ehr_data).lower(),
+                    'has_family_history': 'family history' in str(ehr_data).lower(),
+                    'has_clinical_indication': True,  # Default to True
+                    'provider_credentials_valid': True,  # Default to True
+                    'patient_state': auth.get('patient_state', 'CA')  # Get from auth data or default to CA
+                }
+            except Exception as e:
+                print(f"Error getting EHR data: {e}")
+                # Set default patient context with state
+                patient_context = {
+                    'has_genetic_counseling': False,
+                    'has_family_history': False,
+                    'has_clinical_indication': True,
+                    'provider_credentials_valid': True,
+                    'patient_state': auth.get('patient_state', 'CA')
+                }
+        
+        # Run enhanced insurance analysis
+        async def run_analysis():
+            return await enhanced_insurance_analyzer.analyze_insurance_coverage_and_requirements(
+                cpt_code=cpt_code,
+                insurance_provider=insurance_provider,
+                service_type=service_type,
+                patient_context=patient_context,
+                patient_address=patient_address
+            )
+        
+        # Run the async analysis
+        analysis_result = asyncio.run(run_analysis())
+        
+        # Convert dataclass to dict for JSON serialization
+        result_dict = {
+            'cpt_code': analysis_result.cpt_code,
+            'insurance_provider': analysis_result.insurance_provider,
+            'coverage_status': analysis_result.coverage_status,
+            'coverage_details': analysis_result.coverage_details,
+            'requirements': [
+                {
+                    'requirement_type': req.requirement_type,
+                    'description': req.description,
+                    'evidence_basis': req.evidence_basis,
+                    'documentation_needed': req.documentation_needed,
+                    'clinical_criteria': req.clinical_criteria,
+                    'source_document': req.source_document,
+                    'confidence_score': req.confidence_score
+                }
+                for req in analysis_result.requirements
+            ],
+            'patient_criteria_match': analysis_result.patient_criteria_match,
+            'confidence_score': analysis_result.confidence_score,
+            'search_sources': analysis_result.search_sources,
+            'recommendations': analysis_result.recommendations,
+            'mac_jurisdiction': analysis_result.mac_jurisdiction,
+            'ncd_applicable': analysis_result.ncd_applicable,
+            'lcd_applicable': analysis_result.lcd_applicable
+        }
+        
+        # Add key information for dashboard display
+        dashboard_info = {
+            'cpt_requested': cpt_code,
+            'insurance_provider': insurance_provider,
+            'jurisdiction': analysis_result.mac_jurisdiction if analysis_result.mac_jurisdiction else 'N/A',
+            'patient_state': patient_context.get('patient_state', 'N/A') if patient_context else 'N/A',
+            'patient_address': patient_address if patient_address else 'N/A'
+        }
+        
+        result_dict['dashboard_info'] = dashboard_info
+        
+        # Update the prior authorization status to indicate step 1 is completed
+        db.update_step_status(auth_id, 1, 'completed', 'Insurance coverage & requirements analysis completed')
+        
+        return jsonify({
+            'success': True,
+            'analysis': result_dict,
+            'message': 'Insurance analysis completed successfully'
+        })
+        
+    except Exception as e:
+        print(f"Error analyzing insurance coverage: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # API endpoints for workflows
 @app.get('/api/workflows')

@@ -1558,6 +1558,43 @@ function closeClinicianModal() {
     document.getElementById('clinician-message-modal').style.display = 'none';
 }
 
+// Function to fetch insurance analysis information
+async function fetchInsuranceAnalysisInfo(authId) {
+    try {
+        const response = await fetch(`/api/prior-auths/${authId}/analyze-insurance`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.analysis) {
+                updateInsuranceAnalysisDisplay(data.analysis);
+            }
+        } else {
+            console.error('Failed to fetch insurance analysis:', response.statusText);
+        }
+    } catch (error) {
+        console.error('Error fetching insurance analysis:', error);
+    }
+}
+
+// Function to update insurance analysis display
+function updateInsuranceAnalysisDisplay(analysis) {
+    const jurisdictionDisplay = document.getElementById('jurisdiction-display');
+    const coverageStatusDisplay = document.getElementById('coverage-status-display');
+    
+    if (jurisdictionDisplay) {
+        jurisdictionDisplay.textContent = analysis.dashboard_info?.jurisdiction || 'N/A';
+    }
+    
+    if (coverageStatusDisplay) {
+        coverageStatusDisplay.textContent = analysis.coverage_status || 'N/A';
+    }
+}
+
 function viewDetails(authId) {
     // Find the auth data
     const auth = allPriorAuths.find(a => a.id === authId);
@@ -2280,6 +2317,11 @@ function viewAutomationProgress(authId) {
     // Set current step based on auth data
     currentAutomationStep = auth.current_step || 1;
     
+    // Fetch insurance analysis information if step 1 is completed
+    if (currentAutomationStep > 1) {
+        fetchInsuranceAnalysisInfo(authId);
+    }
+    
     // Update progress bar
     const progressPercent = (currentAutomationStep / 5) * 100;
     document.getElementById('automation-progress-fill').style.width = progressPercent + '%';
@@ -2347,6 +2389,30 @@ function viewAutomationProgress(authId) {
                                             <i class="fas fa-clock"></i>
                                             <span>Completed at ${new Date().toLocaleTimeString()}</span>
                                         </div>
+                                        
+                                        ${stepNumber === 1 ? `
+                                            <div class="insurance-analysis-info">
+                                                <h6><i class="fas fa-search"></i> Insurance Analysis Results</h6>
+                                                <div class="analysis-details">
+                                                    <div class="detail-row">
+                                                        <span class="detail-label">CPT Requested:</span>
+                                                        <span class="detail-value">${auth.cpt_code}</span>
+                                                    </div>
+                                                    <div class="detail-row">
+                                                        <span class="detail-label">Insurance Provider:</span>
+                                                        <span class="detail-value">${auth.insurance_provider}</span>
+                                                    </div>
+                                                    <div class="detail-row">
+                                                        <span class="detail-label">Jurisdiction:</span>
+                                                        <span class="detail-value" id="jurisdiction-display">Loading...</span>
+                                                    </div>
+                                                    <div class="detail-row">
+                                                        <span class="detail-label">Coverage Status:</span>
+                                                        <span class="detail-value" id="coverage-status-display">Loading...</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ` : ''}
                                         <div class="summary-item">
                                             <i class="fas fa-check-circle"></i>
                                             <span>All requirements met</span>

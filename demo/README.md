@@ -7,10 +7,11 @@ This demo showcases an AI agent that automates the prior authorization process f
 ## Key Features
 
 ### 🤖 AI Agent Automation Workflow
-- **5-Step Automation Process**: Coverage determination, requirements extraction, screening, data extraction, and form completion
+- **4-Step Automation Process**: Insurance coverage & requirements analysis (merged), screening, data extraction, and form completion
 - **Real-time Streaming**: Watch the AI agent work through each step with streaming text and visual feedback
 - **Human Oversight**: Built-in checkpoints for human review and intervention
 - **Non-Hallucinating Design**: Agent asks for help when uncertain or encounters issues
+- **GPT-5 Enhanced Analysis**: Real-time insurance policy search and analysis
 
 ### 📊 Interactive Dashboard
 - **Work Queue Management**: View and manage prior authorization requests
@@ -24,11 +25,12 @@ This demo showcases an AI agent that automates the prior authorization process f
 - **Family History**: Detailed family cancer history for genetic testing scenarios
 - **Document Search**: Search through patient documents with citations
 
-### 🔍 GPT-5 Integration (Simulated)
-- **Insurance Requirements Search**: Simulates GPT-5 searching insurance portals for requirements
-- **Document Analysis**: Extracts requirements from policy documents
-- **Coverage Validation**: Validates CPT codes and clinical criteria
-- **Form Requirements**: Identifies required documentation and forms
+### 🔍 Enhanced GPT-5 Integration (Real)
+- **Real GPT-5 Search Mode**: Uses actual GPT-5 API to search insurance portals for requirements
+- **Live Document Analysis**: Extracts requirements from real policy documents
+- **Intelligent Coverage Validation**: Validates CPT codes and clinical criteria with GPT-5 reasoning
+- **Smart Form Requirements**: Identifies required documentation and forms with high accuracy
+- **Fallback Support**: Gracefully handles API failures with intelligent fallback methods
 
 ### 📋 Medicaid Husky Form Integration
 - **Form Population**: Automatically fills out Medicaid Husky forms for genetic testing
@@ -83,9 +85,12 @@ This demo showcases an AI agent that automates the prior authorization process f
    pip install -r requirements.txt
    ```
 
-3. **Set up environment variables** (optional)
+3. **Set up GPT-5 API key** (recommended for full functionality)
    ```bash
-   # Create .env file for GPT-5 API key (for production)
+   # Run the setup script to configure GPT-5 API key
+   python setup_gpt5.py
+   
+   # Or manually create .env file
    echo "GPT5_API_KEY=your_api_key_here" > .env
    ```
 
@@ -94,9 +99,16 @@ This demo showcases an AI agent that automates the prior authorization process f
    python app.py
    ```
 
-5. **Access the demo**
+5. **Test the enhanced functionality**
+   ```bash
+   # Run the test script to verify GPT-5 integration
+   python test_enhanced_insurance.py
+   ```
+
+6. **Access the demo**
    - Open your browser and go to `http://localhost:5000`
    - The dashboard will load with mock prior authorization data
+   - Use the enhanced insurance analysis with real GPT-5 search mode
 
 ## How to Use the Demo
 

@@ -398,19 +398,18 @@ class PriorAuthDatabase:
                 if status == 'pending':
                     current_step = 1
                 elif status == 'running':
-                    current_step = random.randint(2, 4)
+                    current_step = random.randint(2, 3)
                 elif status in ['review', 'feedback', 'completed']:
-                    current_step = 5
+                    current_step = 4
                 else:
                     current_step = 1
                 
                 # Create step details
                 step_details = {
-                    "step1": {"status": "completed" if current_step > 1 else "pending", "details": "Coverage determination"},
-                    "step2": {"status": "completed" if current_step > 2 else "pending", "details": "Insurance requirements"},
-                    "step3": {"status": "completed" if current_step > 3 else "pending", "details": "Screening analysis"},
-                    "step4": {"status": "completed" if current_step > 4 else "pending", "details": "Data extraction"},
-                    "step5": {"status": "completed" if current_step == 5 else "pending", "details": "Form completion"}
+                    "step1": {"status": "completed" if current_step > 1 else "pending", "details": "Insurance coverage & requirements analysis"},
+                    "step2": {"status": "completed" if current_step > 2 else "pending", "details": "Screening analysis"},
+                    "step3": {"status": "completed" if current_step > 3 else "pending", "details": "Data extraction"},
+                    "step4": {"status": "completed" if current_step == 4 else "pending", "details": "Form completion"}
                 }
                 
                 # Generate dates
@@ -486,7 +485,7 @@ class PriorAuthDatabase:
         """Fallback to basic mock data if JSON file is not available"""
         # Basic mock data (simplified version of the original)
         mock_data = [
-            (1, "John Smith", "MRN001", "1985-03-15", "Male", "Original Medicare", "BRCA1/BRCA2 Genetic Testing", "81162", "Family history of breast cancer", "No prior treatment", "None", "2024-02-15", "pending", 1, json.dumps({"step1": {"status": "pending", "details": "Coverage determination not started"}}), "pending", "2024-01-15", "2024-01-22", None, "Family history of breast cancer", "urgent", "Requires genetic counselor review - Medicare LCD", json.dumps([{"name": "Family History Form", "type": "document"}, {"name": "Genetic Counseling Note", "type": "document"}]), "2024-01-15 09:00:00")
+            (1, "John Smith", "MRN001", "1985-03-15", "Male", "Original Medicare", "BRCA1/BRCA2 Genetic Testing", "81162", "Family history of breast cancer", "No prior treatment", "None", "2024-02-15", "pending", 1, json.dumps({"step1": {"status": "pending", "details": "Insurance coverage & requirements analysis not started"}}), "pending", "2024-01-15", "2024-01-22", None, "Family history of breast cancer", "urgent", "Requires genetic counselor review - Medicare LCD", json.dumps([{"name": "Family History Form", "type": "document"}, {"name": "Genetic Counseling Note", "type": "document"}]), "2024-01-15 09:00:00")
         ]
         
         cursor.executemany('''
@@ -616,6 +615,28 @@ class PriorAuthDatabase:
             return True
         return False
     
+    def update_step_status(self, auth_id, step_number, status, details):
+        """Update the status of a specific step"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        # Get current step details
+        cursor.execute('SELECT step_details FROM prior_auths WHERE id = ?', (auth_id,))
+        result = cursor.fetchone()
+        if result:
+            current_step_details = json.loads(result[0]) if result[0] else {}
+            current_step_details[f"step{step_number}"] = {"status": status, "details": details}
+            
+            cursor.execute('''
+                UPDATE prior_auths 
+                SET step_details = ?, last_updated = ?
+                WHERE id = ?
+            ''', (json.dumps(current_step_details), datetime.now().strftime('%Y-%m-%d %H:%M:%S'), auth_id))
+            
+            conn.commit()
+            return True
+        return False
+    
     def approve_step(self, auth_id, step_number):
         """Approve a step and move to next"""
         conn = self.get_connection()
@@ -630,11 +651,11 @@ class PriorAuthDatabase:
             
             # Move to next step or complete
             next_step = step_number + 1
-            if next_step > 5:
+            if next_step > 4:
                 # Complete the automation
                 cursor.execute('''
                     UPDATE prior_auths 
-                    SET status = 'completed', current_step = 5, step_details = ?, last_updated = ?
+                    SET status = 'completed', current_step = 4, step_details = ?, last_updated = ?
                     WHERE id = ?
                 ''', (json.dumps(step_details), datetime.now().strftime('%Y-%m-%d %H:%M:%S'), auth_id))
             else:
