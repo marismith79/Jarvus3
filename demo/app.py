@@ -1,11 +1,10 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, jsonify, request
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from database import db
 
 app = Flask(__name__)
-
-# In-memory demo store for workflows
-# In a real app, replace with a database
-workflows = []
-next_workflow_id = 1
 
 @app.route('/')
 @app.route('/dashboard')
@@ -20,64 +19,97 @@ def agent_setup():
 def settings():
     return render_template('settings.html')
 
-# API endpoints for workflows
-@app.get('/api/workflows')
-def list_workflows():
-    return jsonify(workflows)
+@app.route('/api/prior-auths/<status>')
+def get_prior_auths(status):
+    prior_auths = db.get_prior_auths_by_status(status)
+    return jsonify(prior_auths)
 
+@app.route('/api/prior-auths/stats')
+def get_stats():
+    stats = db.get_stats()
+    return jsonify(stats)
 
-@app.get('/api/workflows/<int:workflow_id>')
-def get_workflow(workflow_id: int):
-    for wf in workflows:
-        if wf["id"] == workflow_id:
-            return jsonify(wf)
-    return jsonify({"error": "Workflow not found"}), 404
+@app.route('/api/prior-auths/<int:auth_id>/start-automation', methods=['POST'])
+def start_automation(auth_id):
+    success = db.start_automation(auth_id)
+    if success:
+        return jsonify({'success': True, 'message': f'Automation started for prior auth {auth_id}'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to start automation'}), 400
 
+@app.route('/api/prior-auths/<int:auth_id>/pause-automation', methods=['POST'])
+def pause_automation(auth_id):
+    success = db.pause_automation(auth_id)
+    if success:
+        return jsonify({'success': True, 'message': f'Automation paused for prior auth {auth_id}'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to pause automation'}), 400
 
-@app.post('/api/workflows')
-def create_workflow():
-    global next_workflow_id
-    data = request.get_json(silent=True) or {}
-    name = (data.get("name") or "").strip()
-    description = (data.get("description") or "").strip()
-    cpt_code = (data.get("cpt_code") or "").strip()
-    payer_nuances = data.get("payer_nuances") or []
-    if not name:
-        return jsonify({"error": "'name' is required"}), 400
-    new_wf = {
-        "id": next_workflow_id,
-        "name": name,
-        "description": description,
-        "cpt_code": cpt_code,
-        "payer_nuances": payer_nuances,
-    }
-    workflows.append(new_wf)
-    next_workflow_id += 1
-    return jsonify(new_wf), 201
+@app.route('/api/prior-auths/<int:auth_id>/approve-step', methods=['POST'])
+def approve_step(auth_id):
+    success = db.approve_step(auth_id)
+    if success:
+        return jsonify({'success': True, 'message': f'Step approved for prior auth {auth_id}'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to approve step'}), 400
 
+@app.route('/api/prior-auths/<int:auth_id>/request-changes', methods=['POST'])
+def request_changes(auth_id):
+    data = request.get_json()
+    changes = data.get('changes')
+    
+    if not changes:
+        return jsonify({'success': False, 'message': 'Changes description is required'}), 400
+    
+    success = db.request_changes(auth_id, changes)
+    if success:
+        return jsonify({'success': True, 'message': f'Changes requested for prior auth {auth_id}'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to request changes'}), 400
 
-@app.put('/api/workflows/<int:workflow_id>')
-def update_workflow(workflow_id: int):
-    data = request.get_json(silent=True) or {}
-    for wf in workflows:
-        if wf["id"] == workflow_id:
-            if "name" in data:
-                name = (data.get("name") or "").strip()
-                if not name:
-                    return jsonify({"error": "'name' is required"}), 400
-                wf["name"] = name
-            if "description" in data:
-                wf["description"] = (data.get("description") or "").strip()
-            if "cpt_code" in data:
-                wf["cpt_code"] = (data.get("cpt_code") or "").strip()
-            if "payer_nuances" in data:
-                # expect list of { payer: str, plan_type: 'medicare_advantage'|'commercial', description: str }
-                pn = data.get("payer_nuances") or []
-                if not isinstance(pn, list):
-                    return jsonify({"error": "'payer_nuances' must be a list"}), 400
-                wf["payer_nuances"] = pn
-            return jsonify(wf)
-    return jsonify({"error": "Workflow not found"}), 404
+@app.route('/api/prior-auths/<int:auth_id>/provide-feedback', methods=['POST'])
+def provide_feedback(auth_id):
+    data = request.get_json()
+    feedback = data.get('feedback')
+    
+    if not feedback:
+        return jsonify({'success': False, 'message': 'Feedback is required'}), 400
+    
+    success = db.provide_feedback(auth_id, feedback)
+    if success:
+        return jsonify({'success': True, 'message': f'Feedback provided for prior auth {auth_id}'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to provide feedback'}), 400
+
+@app.route('/api/prior-auths/<int:auth_id>/update-step', methods=['POST'])
+def update_step(auth_id):
+    data = request.get_json()
+    step_number = data.get('step_number')
+    step_status = data.get('step_status')
+    step_details = data.get('step_details')
+    
+    if not all([step_number, step_status, step_details]):
+        return jsonify({'success': False, 'message': 'Step number, status, and details are required'}), 400
+    
+    success = db.update_step(auth_id, step_number, step_status, step_details)
+    if success:
+        return jsonify({'success': True, 'message': f'Step {step_number} updated for prior auth {auth_id}'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to update step'}), 400
+
+@app.route('/api/prior-auths/<int:auth_id>/update-status', methods=['POST'])
+def update_status(auth_id):
+    data = request.get_json()
+    new_status = data.get('status')
+    
+    if not new_status:
+        return jsonify({'success': False, 'message': 'Status is required'}), 400
+    
+    success = db.update_status(auth_id, new_status)
+    if success:
+        return jsonify({'success': True, 'message': f'Prior auth {auth_id} status updated to {new_status}'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to update status'}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)
