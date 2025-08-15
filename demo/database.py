@@ -19,12 +19,12 @@ class PriorAuthDatabase:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        # Check if table already exists
+        # Check if tables already exist
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='prior_auths'")
         if cursor.fetchone():
-            return  # Table already exists
+            return  # Tables already exist
         
-        # Create table
+        # Create prior_auths table
         cursor.execute('''
             CREATE TABLE prior_auths (
                 id INTEGER PRIMARY KEY,
@@ -54,21 +54,327 @@ class PriorAuthDatabase:
             )
         ''')
         
+        # Create patients table
+        cursor.execute('''
+            CREATE TABLE patients (
+                id INTEGER PRIMARY KEY,
+                mrn TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                dob TEXT,
+                gender TEXT,
+                race TEXT,
+                address TEXT,
+                phone TEXT,
+                email TEXT,
+                insurance_provider TEXT,
+                insurance_plan TEXT,
+                member_id TEXT,
+                diagnosis TEXT,
+                icd10 TEXT,
+                stage TEXT,
+                ecog TEXT,
+                diagnosis_date TEXT
+            )
+        ''')
+        
+        # Create lab_results table
+        cursor.execute('''
+            CREATE TABLE lab_results (
+                id INTEGER PRIMARY KEY,
+                patient_mrn TEXT NOT NULL,
+                test_name TEXT NOT NULL,
+                test_date TEXT,
+                result_value REAL,
+                result_unit TEXT,
+                reference_range TEXT,
+                status TEXT,
+                ordering_provider TEXT,
+                lab_name TEXT,
+                FOREIGN KEY (patient_mrn) REFERENCES patients (mrn)
+            )
+        ''')
+        
+        # Create clinical_documents table
+        cursor.execute('''
+            CREATE TABLE clinical_documents (
+                id INTEGER PRIMARY KEY,
+                patient_mrn TEXT NOT NULL,
+                document_type TEXT NOT NULL,
+                document_date TEXT,
+                document_title TEXT,
+                document_content TEXT,
+                author TEXT,
+                note_id TEXT,
+                FOREIGN KEY (patient_mrn) REFERENCES patients (mrn)
+            )
+        ''')
+        
+        # Create patient_conditions table
+        cursor.execute('''
+            CREATE TABLE patient_conditions (
+                id INTEGER PRIMARY KEY,
+                patient_mrn TEXT NOT NULL,
+                condition_name TEXT NOT NULL,
+                onset_date TEXT,
+                status TEXT,
+                icd10_code TEXT,
+                severity TEXT,
+                FOREIGN KEY (patient_mrn) REFERENCES patients (mrn)
+            )
+        ''')
+        
+        # Create patient_procedures table
+        cursor.execute('''
+            CREATE TABLE patient_procedures (
+                id INTEGER PRIMARY KEY,
+                patient_mrn TEXT NOT NULL,
+                procedure_name TEXT NOT NULL,
+                procedure_date TEXT,
+                cpt_code TEXT,
+                status TEXT,
+                provider TEXT,
+                facility TEXT,
+                FOREIGN KEY (patient_mrn) REFERENCES patients (mrn)
+            )
+        ''')
+        
+        # Create family_history table
+        cursor.execute('''
+            CREATE TABLE family_history (
+                id INTEGER PRIMARY KEY,
+                patient_mrn TEXT NOT NULL,
+                relative TEXT NOT NULL,
+                condition TEXT NOT NULL,
+                age_at_onset INTEGER,
+                status TEXT,
+                FOREIGN KEY (patient_mrn) REFERENCES patients (mrn)
+            )
+        ''')
+        
+        # Create imaging_reports table
+        cursor.execute('''
+            CREATE TABLE imaging_reports (
+                id INTEGER PRIMARY KEY,
+                patient_mrn TEXT NOT NULL,
+                study_type TEXT NOT NULL,
+                study_date TEXT,
+                report_content TEXT,
+                radiologist TEXT,
+                facility TEXT,
+                status TEXT,
+                FOREIGN KEY (patient_mrn) REFERENCES patients (mrn)
+            )
+        ''')
+        
+        # Create treatment_history table
+        cursor.execute('''
+            CREATE TABLE treatment_history (
+                id INTEGER PRIMARY KEY,
+                patient_mrn TEXT NOT NULL,
+                treatment_type TEXT NOT NULL,
+                drug_name TEXT,
+                start_date TEXT,
+                end_date TEXT,
+                line_of_therapy INTEGER,
+                status TEXT,
+                provider TEXT,
+                FOREIGN KEY (patient_mrn) REFERENCES patients (mrn)
+            )
+        ''')
+        
         # Load realistic data from JSON file
         self._load_realistic_data(cursor)
         
         conn.commit()
     
     def _load_realistic_data(self, cursor):
-        """Load realistic prior authorization data from JSON file"""
+        """Load realistic data from JSON file into all tables"""
         json_file_path = os.path.join(os.path.dirname(__file__), 'mock_ehr_pa_oncology_genomics_with_notes_and_fhir.json')
         
         try:
             with open(json_file_path, 'r') as file:
                 data = json.load(file)
             
-            # Convert JSON data to database format
-            mock_data = []
+            # Load patients data
+            patients_data = []
+            for i, patient_record in enumerate(data, 1):
+                admin = patient_record['patient_admin']
+                coverage = patient_record['coverage']
+                diagnosis = patient_record['diagnosis_and_stage']
+                
+                patients_data.append((
+                    i,
+                    admin['mrn'],
+                    f"{admin['name']['given']} {admin['name']['family']}",
+                    admin['dob'],
+                    admin['sex_at_birth'],
+                    admin.get('race', 'Unknown'),
+                    admin.get('address', ''),
+                    admin.get('contact', {}).get('phone', ''),
+                    admin.get('contact', {}).get('email', ''),
+                    coverage['payer'],
+                    coverage.get('plan_type', ''),
+                    coverage.get('member_id', ''),
+                    diagnosis['description'],
+                    diagnosis['primary_icd10'],
+                    diagnosis['stage_group'],
+                    diagnosis['ecog'],
+                    diagnosis['date_of_diagnosis']
+                ))
+            
+            # Insert patients data
+            cursor.executemany('''
+                INSERT INTO patients VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', patients_data)
+            
+            # Load lab results data
+            lab_data = []
+            for patient_record in data:
+                mrn = patient_record['patient_admin']['mrn']
+                labs = patient_record.get('labs', [])
+                for lab in labs:
+                    lab_data.append((
+                        len(lab_data) + 1,
+                        mrn,
+                        lab.get('test_name', 'Unknown Test'),
+                        lab.get('date', datetime.now().strftime('%Y-%m-%d')),
+                        lab.get('value', 0.0),
+                        lab.get('unit', ''),
+                        lab.get('reference_range', ''),
+                        lab.get('status', 'final'),
+                        lab.get('ordering_provider', 'Unknown'),
+                        lab.get('lab_name', 'Unknown Lab')
+                    ))
+            
+            # Insert lab results data
+            if lab_data:
+                cursor.executemany('''
+                    INSERT INTO lab_results VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', lab_data)
+            
+            # Load clinical documents data
+            doc_data = []
+            for patient_record in data:
+                mrn = patient_record['patient_admin']['mrn']
+                
+                # Add pathology report
+                if 'pathology_synoptic' in patient_record:
+                    path = patient_record['pathology_synoptic']
+                    doc_data.append((
+                        len(doc_data) + 1,
+                        mrn,
+                        'Pathology Report',
+                        path['specimen']['collection_date'],
+                        f"Pathology Report - {path['specimen']['type']}",
+                        f"Specimen: {path['specimen']['type']} from {path['specimen']['site']}. Histology: {path['histology']}, Grade: {path['grade']}, Size: {path['tumor_size_mm']}mm. Margins: {path['margins']}, LVI: {path['lvi']}.",
+                        'Pathologist',
+                        f"DOC_{mrn}_PATH"
+                    ))
+                
+                # Add genomic testing report
+                if 'genomic_testing' in patient_record and 'current_test' in patient_record['genomic_testing']:
+                    test = patient_record['genomic_testing']['current_test']
+                    doc_data.append((
+                        len(doc_data) + 1,
+                        mrn,
+                        'Genomic Testing Report',
+                        test['report_date'],
+                        f"Genomic Testing Report - {test['test_name']}",
+                        f"Test: {test['test_name']} (CPT {test['cpt']}). Methodology: {test['methodology']}. Genes analyzed: {test['genes_analyzed']}.",
+                        'Genetic Counselor',
+                        f"DOC_{mrn}_GEN"
+                    ))
+                
+                # Add clinical notes
+                for note in patient_record.get('clinical_notes', []):
+                    doc_data.append((
+                        len(doc_data) + 1,
+                        mrn,
+                        note['type'],
+                        note['date'],
+                        f"{note['type']} - {note['author']}",
+                        note['text'],
+                        note['author'],
+                        note['note_id']
+                    ))
+            
+            # Insert clinical documents data
+            if doc_data:
+                cursor.executemany('''
+                    INSERT INTO clinical_documents VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', doc_data)
+            
+            # Load patient conditions data
+            condition_data = []
+            for patient_record in data:
+                mrn = patient_record['patient_admin']['mrn']
+                diagnosis = patient_record['diagnosis_and_stage']
+                
+                condition_data.append((
+                    len(condition_data) + 1,
+                    mrn,
+                    diagnosis['description'],
+                    diagnosis['date_of_diagnosis'],
+                    'active',
+                    diagnosis['primary_icd10'],
+                    diagnosis['stage_group']
+                ))
+            
+            # Insert patient conditions data
+            if condition_data:
+                cursor.executemany('''
+                    INSERT INTO patient_conditions VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', condition_data)
+            
+            # Load family history data
+            family_data = []
+            for patient_record in data:
+                mrn = patient_record['patient_admin']['mrn']
+                family_history = patient_record.get('family_history', [])
+                
+                for relative in family_history:
+                    family_data.append((
+                        len(family_data) + 1,
+                        mrn,
+                        relative['relative'],
+                        relative['condition'],
+                        relative.get('age_at_onset', 0),
+                        relative.get('status', 'alive')
+                    ))
+            
+            # Insert family history data
+            if family_data:
+                cursor.executemany('''
+                    INSERT INTO family_history VALUES (?, ?, ?, ?, ?, ?)
+                ''', family_data)
+            
+            # Load treatment history data
+            treatment_data = []
+            for patient_record in data:
+                mrn = patient_record['patient_admin']['mrn']
+                treatments = patient_record.get('treatment_history', {}).get('systemic_therapies', [])
+                
+                for therapy in treatments:
+                    treatment_data.append((
+                        len(treatment_data) + 1,
+                        mrn,
+                        'Systemic Therapy',
+                        therapy['drug'],
+                        therapy['start'],
+                        therapy.get('stop'),
+                        therapy['line_of_therapy'],
+                        'completed' if therapy.get('stop') else 'active',
+                        therapy.get('provider', 'Unknown')
+                    ))
+            
+            # Insert treatment history data
+            if treatment_data:
+                cursor.executemany('''
+                    INSERT INTO treatment_history VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', treatment_data)
+            
+            # Load prior authorization data
+            pa_data = []
             for i, patient_record in enumerate(data, 1):
                 admin = patient_record['patient_admin']
                 coverage = patient_record['coverage']
@@ -131,7 +437,7 @@ class PriorAuthDatabase:
                 if patient_record.get('family_history'):
                     ehr_documents.append({"name": "Genetic Counseling Note", "type": "document"})
                 
-                mock_data.append((
+                pa_data.append((
                     i,
                     f"{admin['name']['given']} {admin['name']['family']}",
                     admin['mrn'],
@@ -158,12 +464,12 @@ class PriorAuthDatabase:
                     last_updated.strftime('%Y-%m-%d %H:%M:%S')
                 ))
             
-            # Insert the data
+            # Insert prior authorization data
             cursor.executemany('''
                 INSERT INTO prior_auths VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', mock_data)
+            ''', pa_data)
             
-            print(f"Loaded {len(mock_data)} realistic prior authorization records from JSON file")
+            print(f"Loaded {len(patients_data)} patients, {len(lab_data)} lab results, {len(doc_data)} documents, and {len(pa_data)} prior authorizations from JSON file")
             
         except FileNotFoundError:
             print(f"Warning: Mock EHR JSON file not found at {json_file_path}")

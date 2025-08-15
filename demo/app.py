@@ -1,6 +1,6 @@
 
 from flask import Flask, render_template, jsonify, request
-from mock_ehr_system import MockEHRSystem
+from epic_api_simulation import EpicAPISimulation
 from gpt5_integration import GPT5Integration
 import json
 import sys
@@ -11,7 +11,7 @@ from database import db
 app = Flask(__name__)
 
 # Initialize systems
-ehr_system = MockEHRSystem()
+epic_api = EpicAPISimulation()
 gpt5_system = GPT5Integration()
 
 
@@ -164,95 +164,176 @@ def update_step(auth_id):
         print(f"Error updating step: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
-# Mock EHR System Endpoints
-@app.route('/api/ehr/patient/<mrn>')
+# EPIC API Simulation Endpoints
+@app.route('/api/epic/Patient/<mrn>')
 def get_patient_data(mrn):
-    """Get patient data from mock EHR system"""
+    """Get patient data from EPIC FHIR API"""
     try:
-        patient_data = ehr_system.get_patient_data(mrn)
-        if patient_data:
-            return jsonify(patient_data)
+        patient_response = epic_api.get_patient_by_mrn(mrn)
+        if patient_response and patient_response.get('entry'):
+            return jsonify(patient_response)
         else:
             return jsonify({'error': 'Patient not found'}), 404
     except Exception as e:
-        print(f"Error getting patient data: {e}")
+        print(f"Error getting patient data from EPIC: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/ehr/patient/<mrn>/documents')
-def get_patient_documents(mrn):
-    """Get patient documents from mock EHR system"""
+@app.route('/api/epic/DocumentReference')
+def get_patient_documents():
+    """Get patient documents from EPIC FHIR API"""
     try:
-        documents = ehr_system.get_patient_documents(mrn)
+        patient_id = request.args.get('patient', '')
+        doc_type = request.args.get('type', '')
+        
+        if not patient_id:
+            return jsonify({'error': 'Patient parameter required'}), 400
+        
+        documents = epic_api.get_patient_documents(patient_id, doc_type)
         return jsonify(documents)
     except Exception as e:
-        print(f"Error getting patient documents: {e}")
+        print(f"Error getting patient documents from EPIC: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/ehr/patient/<mrn>/family-history')
-def get_family_history(mrn):
-    """Get patient family history from mock EHR system"""
+@app.route('/api/epic/Observation')
+def get_patient_observations():
+    """Get patient observations (labs, vitals) from EPIC FHIR API"""
     try:
-        family_history = ehr_system.get_family_history(mrn)
+        patient_id = request.args.get('patient', '')
+        category = request.args.get('category', '')
+        
+        if not patient_id:
+            return jsonify({'error': 'Patient parameter required'}), 400
+        
+        observations = epic_api.get_patient_observations(patient_id, category)
+        return jsonify(observations)
+    except Exception as e:
+        print(f"Error getting patient observations from EPIC: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/epic/Condition')
+def get_patient_conditions():
+    """Get patient conditions (diagnoses) from EPIC FHIR API"""
+    try:
+        patient_id = request.args.get('patient', '')
+        
+        if not patient_id:
+            return jsonify({'error': 'Patient parameter required'}), 400
+        
+        conditions = epic_api.get_patient_conditions(patient_id)
+        return jsonify(conditions)
+    except Exception as e:
+        print(f"Error getting patient conditions from EPIC: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/epic/Procedure')
+def get_patient_procedures():
+    """Get patient procedures from EPIC FHIR API"""
+    try:
+        patient_id = request.args.get('patient', '')
+        
+        if not patient_id:
+            return jsonify({'error': 'Patient parameter required'}), 400
+        
+        procedures = epic_api.get_patient_procedures(patient_id)
+        return jsonify(procedures)
+    except Exception as e:
+        print(f"Error getting patient procedures from EPIC: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/epic/FamilyMemberHistory')
+def get_family_history():
+    """Get patient family history from EPIC FHIR API"""
+    try:
+        patient_id = request.args.get('patient', '')
+        
+        if not patient_id:
+            return jsonify({'error': 'Patient parameter required'}), 400
+        
+        family_history = epic_api.get_family_history(patient_id)
         return jsonify(family_history)
     except Exception as e:
-        print(f"Error getting family history: {e}")
+        print(f"Error getting family history from EPIC: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/epic/Patient')
+def search_patients():
+    """Search for patients in EPIC FHIR API"""
+    try:
+        name_query = request.args.get('name', '')
+        identifier_query = request.args.get('identifier', '')
+        
+        if not name_query and not identifier_query:
+            return jsonify({'error': 'Name or identifier parameter required'}), 400
+        
+        query = name_query or identifier_query
+        patients = epic_api.search_patients(query)
+        return jsonify(patients)
+    except Exception as e:
+        print(f"Error searching patients in EPIC: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# Legacy endpoints for backward compatibility
+@app.route('/api/ehr/patient/<mrn>')
+def get_patient_data_legacy(mrn):
+    """Legacy endpoint - redirects to EPIC API"""
+    return get_patient_data(mrn)
+
+@app.route('/api/ehr/patient/<mrn>/documents')
+def get_patient_documents_legacy(mrn):
+    """Legacy endpoint - redirects to EPIC API"""
+    # Add patient parameter to request args
+    from flask import request
+    request.args = request.args.copy()
+    request.args['patient'] = mrn
+    return get_patient_documents()
 
 @app.route('/api/ehr/patient/<mrn>/lab-results')
-def get_lab_results(mrn):
-    """Get patient lab results from mock EHR system"""
-    try:
-        lab_results = ehr_system.get_lab_results(mrn)
-        return jsonify(lab_results)
-    except Exception as e:
-        print(f"Error getting lab results: {e}")
-        return jsonify({'error': str(e)}), 500
+def get_lab_results_legacy(mrn):
+    """Legacy endpoint - redirects to EPIC API"""
+    # Add patient parameter to request args
+    from flask import request
+    request.args = request.args.copy()
+    request.args['patient'] = mrn
+    return get_patient_observations()
 
-@app.route('/api/ehr/patient/<mrn>/imaging')
-def get_imaging(mrn):
-    """Get patient imaging reports from mock EHR system"""
-    try:
-        imaging = ehr_system.get_imaging(mrn)
-        return jsonify(imaging)
-    except Exception as e:
-        print(f"Error getting imaging: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/ehr/patient/<mrn>/treatment-history')
-def get_treatment_history(mrn):
-    """Get patient treatment history from mock EHR system"""
-    try:
-        treatment_history = ehr_system.get_treatment_history(mrn)
-        return jsonify(treatment_history)
-    except Exception as e:
-        print(f"Error getting treatment history: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/ehr/patient/<mrn>/search')
-def search_documents(mrn):
-    """Search patient documents in mock EHR system"""
-    try:
-        query = request.args.get('q', '')
-        if not query:
-            return jsonify({'error': 'Query parameter required'}), 400
-        
-        results = ehr_system.search_documents(mrn, query)
-        return jsonify(results)
-    except Exception as e:
-        print(f"Error searching documents: {e}")
-        return jsonify({'error': str(e)}), 500
+@app.route('/api/ehr/patient/<mrn>/family-history')
+def get_family_history_legacy(mrn):
+    """Legacy endpoint - redirects to EPIC API"""
+    # Add patient parameter to request args
+    from flask import request
+    request.args = request.args.copy()
+    request.args['patient'] = mrn
+    return get_family_history()
 
 @app.route('/api/ehr/patient/<mrn>/clinical-summary')
-def get_clinical_summary(mrn):
-    """Get comprehensive clinical summary from mock EHR system"""
+def get_clinical_summary_legacy(mrn):
+    """Get comprehensive clinical summary from EPIC FHIR API"""
     try:
-        summary = ehr_system.get_clinical_summary(mrn)
-        if summary:
-            return jsonify(summary)
-        else:
+        # Get patient data
+        patient_response = epic_api.get_patient_by_mrn(mrn)
+        if not patient_response or not patient_response.get('entry'):
             return jsonify({'error': 'Patient not found'}), 404
+        
+        patient = patient_response['entry'][0]['resource']
+        
+        # Get additional data
+        observations = epic_api.get_patient_observations(mrn)
+        documents = epic_api.get_patient_documents(mrn)
+        conditions = epic_api.get_patient_conditions(mrn)
+        procedures = epic_api.get_patient_procedures(mrn)
+        
+        # Create summary
+        summary = {
+            'patient': patient,
+            'lab_count': observations.get('total', 0),
+            'document_count': documents.get('total', 0),
+            'condition_count': conditions.get('total', 0),
+            'procedure_count': procedures.get('total', 0)
+        }
+        
+        return jsonify(summary)
     except Exception as e:
-        print(f"Error getting clinical summary: {e}")
+        print(f"Error getting clinical summary from EPIC: {e}")
         return jsonify({'error': str(e)}), 500
 
 # GPT-5 Integration Endpoints
@@ -316,8 +397,14 @@ def get_workflow_status(auth_id):
 def reset_database():
     """Reset the database for demo purposes"""
     try:
+        # Delete the database file to force recreation
+        import os
+        if os.path.exists('demo.db'):
+            os.remove('demo.db')
+        
+        # Reinitialize the database
         success = db.reset_database()
-        return jsonify({'success': success, 'message': 'Database reset successfully'})
+        return jsonify({'success': success, 'message': 'Database reset successfully with new schema'})
     except Exception as e:
         print(f"Error resetting database: {e}")
         return jsonify({'success': False, 'error': str(e)})
