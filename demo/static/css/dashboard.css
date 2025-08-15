@@ -209,6 +209,11 @@
     background: #f8f9fa;
 }
 
+.queue-table tbody tr:hover {
+    background: #e3f2fd;
+    cursor: pointer;
+}
+
 /* Column Specific Styles */
 .checkbox-col {
     width: 40px;

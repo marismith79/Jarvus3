@@ -21,20 +21,13 @@ gpt5_system = GPT5Integration()
 workflows = [
     {
         "id": 1,
-        "name": "Onboarding Flow",
-        "description": "Welcomes new users and collects initial preferences.",
-        "cpt_code": "",
-        "payer_nuances": [],
-    },
-    {
-        "id": 2,
-        "name": "Support Triage",
-        "description": "Routes incoming support requests to appropriate queues.",
-        "cpt_code": "",
+        "name": "BRCA1/BRCA2 Genetic Testing",
+        "description": "Pull data from the clinician notes and the pathology section",
+        "cpt_code": "81162",
         "payer_nuances": [],
     },
 ]
-next_workflow_id = 3
+next_workflow_id = 2
 
 @app.route('/')
 @app.route('/dashboard')
