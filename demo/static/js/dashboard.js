@@ -38,8 +38,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function setupEventListeners() {
-    // Tab navigation
-    document.querySelectorAll('.tab-button').forEach(button => {
+    // EPIC-style tab navigation
+    document.querySelectorAll('.epic-tab-button').forEach(button => {
         button.addEventListener('click', function() {
             const tab = this.dataset.tab;
             switchTab(tab);
@@ -49,7 +49,7 @@ function setupEventListeners() {
     // Search and filters
     document.getElementById('search-input').addEventListener('input', filterData);
     document.getElementById('provider-filter').addEventListener('change', filterData);
-    document.getElementById('step-filter').addEventListener('change', filterData);
+    document.getElementById('status-filter').addEventListener('change', filterData);
 
     // Select all checkbox
     document.getElementById('select-all').addEventListener('change', function() {
@@ -67,13 +67,16 @@ function setupEventListeners() {
             sortData(field);
         });
     });
+
+    // Update last refreshed time
+    updateLastRefreshedTime();
 }
 
 function switchTab(tab) {
     currentTab = tab;
     
     // Update active tab button
-    document.querySelectorAll('.tab-button').forEach(button => {
+    document.querySelectorAll('.epic-tab-button').forEach(button => {
         button.classList.remove('active');
     });
     document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
@@ -107,6 +110,7 @@ async function loadData() {
         renderTable();
         console.log('About to call updateStats...');
         updateStats();
+        updateLastRefreshedTime();
         showLoading(false);
         console.log('=== loadData completed ===');
     } catch (error) {
@@ -188,72 +192,57 @@ function renderTable() {
 
 function createTableRow(auth) {
     const row = document.createElement('tr');
-    const currentStep = auth.current_step || 1;
-    const progress = (currentStep / 2) * 100;
+    row.className = 'clickable-row';
+    row.style.cursor = 'pointer';
     
     row.innerHTML = `
         <td class="checkbox-col">
-            <input type="checkbox" class="auth-checkbox" value="${auth.id}" onchange="updateBulkActions()">
+            <input type="checkbox" class="auth-checkbox" value="${auth.id}" onchange="updateBulkActions()" onclick="event.stopPropagation()">
         </td>
         <td class="patient-col">
-            <div class="patient-info">
-                <div class="patient-name">${auth.patient_name}</div>
-                <div class="patient-mrn">MRN: ${auth.patient_mrn}</div>
-                <div class="clinical-urgency ${auth.clinical_urgency}">${auth.clinical_urgency}</div>
-            </div>
+            <div class="patient-name">${auth.patient_name}</div>
         </td>
-        <td class="service-col">
-            <div class="service-info">
-                <div class="service-type">${auth.service_type}</div>
-                <div class="service-notes">${auth.notes}</div>
-            </div>
+        <td class="created-col">
+            <div class="created-date">${formatDate(auth.created_date)}</div>
         </td>
-        <td class="cpt-col">
-            <span class="cpt-code">${auth.cpt_code || 'N/A'}</span>
+        <td class="priority-col">
+            <span class="priority-badge priority-${auth.clinical_urgency || 'routine'}">${getPriorityDisplay(auth.clinical_urgency)}</span>
         </td>
-        <td class="insurance-col">
-            <div class="insurance-info">
-                <div class="insurance-provider">${auth.insurance_provider}</div>
-                <div class="insurance-requirements">${auth.insurance_requirements}</div>
-            </div>
-        </td>
-        <td class="progress-col">
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: ${progress}%"></div>
-            </div>
-            <div class="progress-text">${Math.round(progress)}%</div>
-        </td>
-        <td class="current-step-col">
-            <div class="step-indicator">
-                <span class="step-number">${currentStep}</span>
-                <span class="step-name">${getStepName(currentStep)}</span>
-            </div>
+        <td class="type-col">
+            <div class="service-type">${auth.service_type}</div>
         </td>
         <td class="status-col">
             <span class="status-badge status-${auth.status}">${getStatusDisplay(auth.status)}</span>
         </td>
-        <td class="dates-col">
-            <div class="date-info">
-                <div class="created-date">${formatDate(auth.created_date)}</div>
-            </div>
+        <td class="ref-by-prov-col">
+            <div class="ref-provider">${auth.ordering_provider || 'Dr. Smith'}</div>
         </td>
-        <td class="due-col">
-            <div class="date-info">
-                <div class="due-date ${isOverdue(auth.due_date) ? 'overdue' : ''}">${formatDate(auth.due_date)}</div>
-            </div>
+        <td class="ref-by-dept-col">
+            <div class="ref-department">${auth.ordering_department || 'ONCOLOGY'}</div>
         </td>
-        <td class="actions-col">
-            <div class="action-buttons">
-                <button class="btn btn-sm btn-outline" onclick="viewDetails(${auth.id})" title="View Details">
-                    <i class="fas fa-eye"></i>
-                </button>
-                <button class="btn btn-sm btn-outline" onclick="viewStepDetails(${auth.id})" title="View Step Details">
-                    <i class="fas fa-tasks"></i>
-                </button>
-                ${getActionButton(auth)}
-            </div>
+        <td class="insurance-col">
+            <div class="insurance-provider">${auth.insurance_provider}</div>
+        </td>
+        <td class="cpt-col">
+            <span class="cpt-code">${auth.cpt_code || 'N/A'}</span>
+        </td>
+        <td class="last-comm-date-col">
+            <div class="last-comm-date">${formatDate(auth.last_updated || auth.created_date)}</div>
+        </td>
+        <td class="comm-outcome-col">
+            <div class="comm-outcome">${getCommOutcome(auth.status)}</div>
+        </td>
+        <td class="comm-comments-col">
+            <div class="comm-comments">${auth.notes || ''}</div>
         </td>
     `;
+    
+    // Add click event listener to the row
+    row.addEventListener('click', function(e) {
+        if (!e.target.closest('.checkbox-col')) {
+            showCaseDetails(auth);
+        }
+    });
     
     return row;
 }
@@ -268,14 +257,41 @@ function getStepName(step) {
 
 function getStatusDisplay(status) {
     const statusMap = {
-        'pending': 'Pending',
+        'pending': 'Not Started',
         'running': 'In Progress',
-        'review': 'Human Review',
-        'feedback': 'Needs Input',
-        'completed': 'Completed',
+        'review': 'In Progress',
+        'feedback': 'In Progress',
+        'completed': 'Complete',
         'failed': 'Failed'
     };
     return statusMap[status] || status;
+}
+
+function getPriorityDisplay(priority) {
+    const priorityMap = {
+        'urgent': 'Urgent',
+        'routine': 'Routine',
+        'stat': 'Stat'
+    };
+    return priorityMap[priority] || 'Routine';
+}
+
+function getCommOutcome(status) {
+    const outcomeMap = {
+        'pending': 'Left Message',
+        'running': 'In Progress',
+        'review': 'Pending Review',
+        'feedback': 'Needs Info',
+        'completed': 'Authorized',
+        'failed': 'Failed'
+    };
+    return outcomeMap[status] || 'No Action';
+}
+
+function updateLastRefreshedTime() {
+    const now = new Date();
+    const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+    document.getElementById('last-refreshed-time').textContent = timeString;
 }
 
 function getActionButton(auth) {
@@ -311,7 +327,7 @@ function isOverdue(dueDate) {
 function filterData() {
     const searchTerm = document.getElementById('search-input').value.toLowerCase();
     const providerFilter = document.getElementById('provider-filter').value;
-    const stepFilter = document.getElementById('step-filter').value;
+    const statusFilter = document.getElementById('status-filter').value;
     
     filteredPriorAuths = allPriorAuths.filter(auth => {
         const matchesSearch = !searchTerm || 
@@ -321,9 +337,9 @@ function filterData() {
             (auth.cpt_code && auth.cpt_code.toLowerCase().includes(searchTerm));
         
         const matchesProvider = !providerFilter || auth.insurance_provider === providerFilter;
-        const matchesStep = !stepFilter || (auth.current_step || 1) == stepFilter;
+        const matchesStatus = !statusFilter || auth.status === statusFilter;
         
-        return matchesSearch && matchesProvider && matchesStep;
+        return matchesSearch && matchesProvider && matchesStatus;
     });
     
     // Apply current sorting
@@ -400,6 +416,100 @@ function clearSelection() {
     });
     document.getElementById('select-all').checked = false;
     updateBulkActions();
+}
+
+// EPIC-style action functions
+function deferSelected() {
+    const selectedIds = Array.from(document.querySelectorAll('.auth-checkbox:checked'))
+        .map(checkbox => checkbox.value);
+    
+    if (selectedIds.length === 0) {
+        alert('Please select items to defer.');
+        return;
+    }
+    
+    if (confirm(`Defer ${selectedIds.length} selected item(s)?`)) {
+        // Implementation for deferring items
+        console.log('Deferring items:', selectedIds);
+        alert('Items deferred successfully.');
+        loadData();
+    }
+}
+
+function showFilterModal() {
+    alert('Filter modal would open here.');
+}
+
+function addNotes() {
+    const selectedIds = Array.from(document.querySelectorAll('.auth-checkbox:checked'))
+        .map(checkbox => checkbox.value);
+    
+    if (selectedIds.length === 0) {
+        alert('Please select an item to add notes to.');
+        return;
+    }
+    
+    const notes = prompt('Enter notes:');
+    if (notes) {
+        console.log('Adding notes to items:', selectedIds, notes);
+        alert('Notes added successfully.');
+    }
+}
+
+function editSelected() {
+    const selectedIds = Array.from(document.querySelectorAll('.auth-checkbox:checked'))
+        .map(checkbox => checkbox.value);
+    
+    if (selectedIds.length === 0) {
+        alert('Please select an item to edit.');
+        return;
+    }
+    
+    if (selectedIds.length > 1) {
+        alert('Please select only one item to edit.');
+        return;
+    }
+    
+    // Open edit modal or redirect to edit page
+    console.log('Editing item:', selectedIds[0]);
+    alert('Edit modal would open here.');
+}
+
+function assignSelected() {
+    const selectedIds = Array.from(document.querySelectorAll('.auth-checkbox:checked'))
+        .map(checkbox => checkbox.value);
+    
+    if (selectedIds.length === 0) {
+        alert('Please select items to assign.');
+        return;
+    }
+    
+    const assignee = prompt('Enter assignee name:');
+    if (assignee) {
+        console.log('Assigning items to:', assignee, selectedIds);
+        alert('Items assigned successfully.');
+        loadData();
+    }
+}
+
+function viewChart() {
+    alert('Chart view would open here.');
+}
+
+function sendMessage() {
+    alert('Message interface would open here.');
+}
+
+function newCall() {
+    alert('Call interface would open here.');
+}
+
+function showMore() {
+    alert('Additional actions would be shown here.');
+}
+
+function viewHistory() {
+    alert('Work queue history would open here.');
 }
 
 async function startAutomation(authId = null) {
@@ -2240,14 +2350,7 @@ function regenerateForm() {
     executeFormCompletionWithEHR();
 }
 
-function viewDetails(authId) {
-    // Find the auth data
-    const auth = allPriorAuths.find(a => a.id === authId);
-    if (!auth) {
-        console.error('Auth not found:', authId);
-        return;
-    }
-    
+function showCaseDetails(auth) {
     // Create the modal content
     const modalContent = `
         <div class="auth-details">
@@ -2314,7 +2417,7 @@ function viewDetails(authId) {
                 <div class="detail-grid">
                     <div class="detail-item">
                         <label>Status:</label>
-                        <span class="status-badge ${auth.status}">${auth.status}</span>
+                        <span class="status-badge ${auth.status}">${getStatusDisplay(auth.status)}</span>
                     </div>
                     <div class="detail-item">
                         <label>Current Step:</label>
@@ -2336,15 +2439,15 @@ function viewDetails(authId) {
                 <div class="detail-grid">
                     <div class="detail-item">
                         <label>Created Date:</label>
-                        <span>${auth.created_date}</span>
+                        <span>${formatDate(auth.created_date)}</span>
                     </div>
                     <div class="detail-item">
                         <label>Due Date:</label>
-                        <span>${auth.due_date}</span>
+                        <span>${formatDate(auth.due_date)}</span>
                     </div>
                     <div class="detail-item">
                         <label>Last Updated:</label>
-                        <span>${auth.last_updated}</span>
+                        <span>${formatDate(auth.last_updated)}</span>
                     </div>
                 </div>
             </div>
@@ -2373,24 +2476,62 @@ function viewDetails(authId) {
         </div>
     `;
     
+    // Set modal title
+    document.getElementById('modal-title').textContent = `Prior Authorization Details - ${auth.patient_name}`;
+    
     // Populate the modal body
     document.getElementById('modal-body').innerHTML = modalContent;
     
     // Update the action button based on status
     const actionBtn = document.getElementById('modal-action-btn');
+    
     if (auth.status === 'pending') {
-        actionBtn.textContent = 'Start Automation';
-        actionBtn.onclick = () => startAutomation(auth.id);
+        actionBtn.textContent = '🤖 Start Automation';
+        actionBtn.className = 'btn btn-primary';
+        actionBtn.onclick = () => {
+            closeModal();
+            startAutomation(auth.id);
+        };
     } else if (auth.status === 'running') {
-        actionBtn.textContent = 'View Progress';
-        actionBtn.onclick = () => viewAutomationProgress(auth.id);
+        actionBtn.textContent = '📊 View Progress';
+        actionBtn.className = 'btn btn-info';
+        actionBtn.onclick = () => {
+            closeModal();
+            viewAutomationProgress(auth.id);
+        };
+    } else if (auth.status === 'completed') {
+        actionBtn.textContent = '📋 View Automation History';
+        actionBtn.className = 'btn btn-success';
+        actionBtn.onclick = () => {
+            closeModal();
+            viewAutomationProgress(auth.id);
+        };
+    } else if (auth.status === 'review' || auth.status === 'feedback') {
+        actionBtn.textContent = '📊 View Progress';
+        actionBtn.className = 'btn btn-warning';
+        actionBtn.onclick = () => {
+            closeModal();
+            viewAutomationProgress(auth.id);
+        };
     } else {
-        actionBtn.textContent = 'View Details';
+        actionBtn.textContent = '📋 View Details';
+        actionBtn.className = 'btn btn-secondary';
         actionBtn.onclick = () => closeModal();
     }
     
     // Show the modal
     document.getElementById('auth-detail-modal').style.display = 'block';
+}
+
+function viewDetails(authId) {
+    // Find the auth data
+    const auth = allPriorAuths.find(a => a.id === authId);
+    if (!auth) {
+        console.error('Auth not found:', authId);
+        return;
+    }
+    
+    showCaseDetails(auth);
 }
 
 function closeModal() {

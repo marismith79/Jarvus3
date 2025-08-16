@@ -14,43 +14,80 @@
 <div class="work-queue-container">
 
 
-    <!-- Tab Navigation -->
-    <div class="tab-navigation">
-        <button class="tab-button active" data-tab="all">
-            <i class="fas fa-list"></i>
-            All Requests
-            <span class="tab-count" id="all-count">0</span>
+
+    <!-- EPIC-style Action Bar -->
+    <div class="epic-action-bar">
+        <button class="epic-action-btn" onclick="loadData()" title="Refresh">
+            <i class="fas fa-sync-alt"></i>
+            Refresh
         </button>
-        <button class="tab-button" data-tab="running">
-            <i class="fas fa-play-circle"></i>
-            In Progress
-            <span class="tab-count" id="running-tab-count">0</span>
+        <button class="epic-action-btn" onclick="deferSelected()" title="Defer">
+            <i class="fas fa-clock"></i>
+            Defer
         </button>
-        <button class="tab-button" data-tab="review">
-            <i class="fas fa-eye"></i>
-            Human Review
-            <span class="tab-count" id="review-tab-count">0</span>
+        <button class="epic-action-btn" onclick="showFilterModal()" title="Filter">
+            <i class="fas fa-filter"></i>
+            Filter
         </button>
-        <button class="tab-button" data-tab="feedback">
-            <i class="fas fa-question-circle"></i>
-            Needs Input
-            <span class="tab-count" id="feedback-tab-count">0</span>
+        <button class="epic-action-btn" onclick="addNotes()" title="Notes">
+            <i class="fas fa-sticky-note"></i>
+            Notes
         </button>
-        <button class="tab-button" data-tab="completed">
-            <i class="fas fa-check-circle"></i>
-            Completed
-            <span class="tab-count" id="completed-tab-count">0</span>
+        <button class="epic-action-btn" onclick="editSelected()" title="Edit">
+            <i class="fas fa-edit"></i>
+            Edit
+        </button>
+        <button class="epic-action-btn" onclick="startAutomation()" title="Start Automation">
+            <i class="fas fa-robot"></i>
+            Start Auto
+        </button>
+        <button class="epic-action-btn" onclick="assignSelected()" title="Assign">
+            <i class="fas fa-user-plus"></i>
+            Assign
+        </button>
+        <button class="epic-action-btn" onclick="viewChart()" title="Chart">
+            <i class="fas fa-chart-bar"></i>
+            Chart
+        </button>
+        <button class="epic-action-btn" onclick="sendMessage()" title="In Basket Msg">
+            <i class="fas fa-inbox"></i>
+            In Basket Msg
+        </button>
+        <button class="epic-action-btn" onclick="newCall()" title="New Call">
+            <i class="fas fa-phone"></i>
+            New Call
+        </button>
+        <button class="epic-action-btn" onclick="showMore()" title="Show More">
+            <i class="fas fa-chevron-down"></i>
+            Show More
+        </button>
+        <button class="epic-action-btn" onclick="viewHistory()" title="WQ History">
+            <i class="fas fa-calendar"></i>
+            WQ History
         </button>
     </div>
 
-    <!-- Filter and Search Bar -->
-    <div class="filter-bar">
-        <div class="search-box">
+    <!-- EPIC-style Tab Navigation -->
+    <div class="epic-tab-navigation">
+        <button class="epic-tab-button active" data-tab="all">
+            Active (Total <span id="all-count">0</span>)
+        </button>
+        <button class="epic-tab-button" data-tab="deferred">
+            Deferred (Total <span id="deferred-count">0</span>)
+        </button>
+        <button class="epic-tab-button" data-tab="completed">
+            Completed (Total <span id="completed-tab-count">0</span>)
+        </button>
+    </div>
+
+    <!-- EPIC-style Search and Filter Bar -->
+    <div class="epic-filter-bar">
+        <div class="epic-search-box">
             <i class="fas fa-search"></i>
-            <input type="text" id="search-input" placeholder="Search by patient name, MRN, or service type...">
+            <input type="text" id="search-input" placeholder="Search patients...">
         </div>
-        <div class="filter-controls">
-            <select id="provider-filter">
+        <div class="epic-filter-controls">
+            <select id="provider-filter" class="epic-select">
                 <option value="">All Payers</option>
                 <option value="Original Medicare">Original Medicare</option>
                 <option value="Humana Medicare Advantage">Humana Medicare Advantage</option>
@@ -61,59 +98,15 @@
                 <option value="Cigna Medicare Advantage">Cigna Medicare Advantage</option>
                 <option value="Blue Cross Medicare Advantage">Blue Cross Medicare Advantage</option>
             </select>
-            <select id="step-filter">
-                <option value="">All Steps</option>
-                <option value="1">Step 1: Coverage Determination</option>
-                <option value="2">Step 2: Requirements Extraction</option>
-                <option value="3">Step 3: Screening</option>
-                <option value="4">Step 4: Data Extraction</option>
-                <option value="5">Step 5: Form Submission</option>
+            <select id="status-filter" class="epic-select">
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="running">In Progress</option>
+                <option value="review">Human Review</option>
+                <option value="feedback">Needs Input</option>
+                <option value="completed">Completed</option>
             </select>
-            <button class="refresh-btn" onclick="loadData()">
-                <i class="fas fa-sync-alt"></i>
-                Refresh
-            </button>
         </div>
-    </div>
-
-    <!-- Work Queue Table -->
-    <div class="queue-table-container">
-        <table class="queue-table" id="prior-auth-table">
-            <thead>
-                <tr>
-                    <th class="checkbox-col">
-                        <input type="checkbox" id="select-all">
-                    </th>
-                    <th class="patient-col sortable" data-sort="patient_name">
-                        Patient <i class="fas fa-sort"></i>
-                    </th>
-                    <th class="service-col sortable" data-sort="service_type">
-                        Service Type <i class="fas fa-sort"></i>
-                    </th>
-                    <th class="cpt-col sortable" data-sort="cpt_code">
-                        CPT Code <i class="fas fa-sort"></i>
-                    </th>
-                    <th class="insurance-col sortable" data-sort="insurance_provider">
-                        Insurance <i class="fas fa-sort"></i>
-                    </th>
-                    <th class="progress-col">Progress</th>
-                    <th class="current-step-col">Current Step</th>
-                    <th class="status-col sortable" data-sort="status">
-                        Status <i class="fas fa-sort"></i>
-                    </th>
-                    <th class="dates-col sortable" data-sort="created_date">
-                        Created <i class="fas fa-sort"></i>
-                    </th>
-                    <th class="due-col sortable" data-sort="due_date">
-                        Due <i class="fas fa-sort"></i>
-                    </th>
-                    <th class="actions-col">Actions</th>
-                </tr>
-            </thead>
-            <tbody id="prior-auth-tbody">
-                <!-- Data will be loaded dynamically -->
-            </tbody>
-        </table>
     </div>
 
     <!-- Bulk Actions Bar -->
@@ -137,6 +130,58 @@
         </div>
     </div>
 
+    <!-- EPIC-style Work Queue Table -->
+    <div class="epic-table-container">
+        <table class="epic-table" id="prior-auth-table">
+            <thead>
+                <tr>
+                    <th class="checkbox-col">
+                        <input type="checkbox" id="select-all">
+                    </th>
+                    <th class="patient-col sortable" data-sort="patient_name">
+                        Patient Name <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="created-col sortable" data-sort="created_date">
+                        Created <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="priority-col sortable" data-sort="clinical_urgency">
+                        Priority <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="type-col sortable" data-sort="service_type">
+                        Type <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="status-col sortable" data-sort="status">
+                        Status <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="ref-by-prov-col sortable" data-sort="ordering_provider">
+                        Ref By Prov <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="ref-by-dept-col sortable" data-sort="ordering_department">
+                        Ref By Dept <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="insurance-col sortable" data-sort="insurance_provider">
+                        Insurance <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="cpt-col sortable" data-sort="cpt_code">
+                        CPT Code <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="last-comm-date-col sortable" data-sort="last_updated">
+                        Last Comm Date <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="comm-outcome-col">
+                        Comm Outcome
+                    </th>
+                    <th class="comm-comments-col">
+                        Comm Cmnts
+                    </th>
+                </tr>
+            </thead>
+            <tbody id="prior-auth-tbody">
+                <!-- Data will be loaded dynamically -->
+            </tbody>
+        </table>
+    </div>
+
     <!-- Loading Spinner -->
     <div class="loading-spinner" id="loading-spinner" style="display: none;">
         <div class="spinner"></div>
@@ -153,9 +198,9 @@
 
 <!-- Prior Auth Detail Modal -->
 <div class="modal" id="auth-detail-modal">
-    <div class="modal-content large-modal">
+    <div class="modal-content epic-modal">
         <div class="modal-header">
-            <h2>Prior Authorization Details</h2>
+            <h2 id="modal-title">Prior Authorization Details</h2>
             <span class="close" onclick="closeModal()">&times;</span>
         </div>
         <div class="modal-body" id="modal-body">

@@ -10,6 +10,26 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 from openai import OpenAI
 
+# Import configuration
+from config.mac_jurisdictions import MAC_JURISDICTIONS, STATE_MAPPING
+from config.gpt_prompts import (
+    create_medicare_search_prompt,
+    create_medicare_document_analysis_prompt,
+    create_medicare_analysis_prompt,
+    create_parsing_agent_prompt,
+    create_criteria_matching_prompt,
+    create_recommendations_prompt
+)
+from config.defaults import (
+    DEFAULT_REQUIREMENTS,
+    DEFAULT_CLINICAL_CRITERIA,
+    DEFAULT_RECOMMENDATIONS,
+    DEFAULT_DOCUMENT_INFO,
+    DEFAULT_PARSING_RESULT,
+    get_default_coverage_analysis,
+    get_default_criteria_match
+)
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -68,146 +88,7 @@ class EnhancedInsuranceAnalysis:
             self.gpt_model = 'gpt-4o-mini-search-preview'
         
         # Medicare Administrative Contractors (MACs) and their jurisdictions
-        self.mac_jurisdictions = {
-            "jurisdiction_a": {
-                "name": "Noridian Healthcare Solutions",
-                "states": ["CT", "DE", "DC", "ME", "MD", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"],
-                "website": "https://med.noridianmedicare.com",
-                "description": "Jurisdiction A - DME MAC"
-            },
-            "jurisdiction_b": {
-                "name": "CGS Administrators",
-                "states": ["IL", "IN", "KY", "MI", "MN", "OH", "WI"],
-                "website": "https://www.cgsmedicare.com",
-                "description": "Jurisdiction B - DME MAC"
-            },
-            "jurisdiction_c": {
-                "name": "CGS Administrators",
-                "states": ["AL", "AR", "CO", "FL", "GA", "LA", "MS", "NM", "NC", "OK", "SC", "TN", "TX", "VA", "WV"],
-                "website": "https://www.cgsmedicare.com",
-                "description": "Jurisdiction C - DME MAC"
-            },
-            "jurisdiction_d": {
-                "name": "Noridian Healthcare Solutions",
-                "states": ["AK", "AZ", "CA", "HI", "ID", "IA", "KS", "MO", "MT", "NE", "NV", "ND", "OR", "SD", "UT", "WA", "WY"],
-                "website": "https://med.noridianmedicare.com",
-                "description": "Jurisdiction D - DME MAC"
-            },
-            "jurisdiction_e": {
-                "name": "CGS Administrators",
-                "states": ["CA", "HI", "NV"],
-                "website": "https://www.cgsmedicare.com",
-                "description": "Jurisdiction E - DME MAC"
-            },
-            "jurisdiction_f": {
-                "name": "CGS Administrators",
-                "states": ["AL", "GA", "TN"],
-                "website": "https://www.cgsmedicare.com",
-                "description": "Jurisdiction F - DME MAC"
-            },
-            "jurisdiction_g": {
-                "name": "CGS Administrators",
-                "states": ["FL", "PR", "VI"],
-                "website": "https://www.cgsmedicare.com",
-                "description": "Jurisdiction G - DME MAC"
-            },
-            "jurisdiction_h": {
-                "name": "CGS Administrators",
-                "states": ["CA"],
-                "website": "https://www.cgsmedicare.com",
-                "description": "Jurisdiction H - DME MAC"
-            },
-            "jurisdiction_j": {
-                "name": "Palmetto GBA",
-                "states": ["AL", "GA", "NC", "SC", "TN", "VA", "WV"],
-                "website": "https://www.palmettogba.com",
-                "description": "Jurisdiction J - Part A/B MAC"
-            },
-            "jurisdiction_k": {
-                "name": "National Government Services",
-                "states": ["CT", "ME", "MA", "NH", "RI", "VT"],
-                "website": "https://www.ngsmedicare.com",
-                "description": "Jurisdiction K - Part A/B MAC"
-            },
-            "jurisdiction_l": {
-                "name": "First Coast Service Options",
-                "states": ["FL"],
-                "website": "https://www.fcso.com",
-                "description": "Jurisdiction L - Part A/B MAC"
-            },
-            "jurisdiction_m": {
-                "name": "CGS Administrators",
-                "states": ["IN", "KY"],
-                "website": "https://www.cgsmedicare.com",
-                "description": "Jurisdiction M - Part A/B MAC"
-            },
-            "jurisdiction_n": {
-                "name": "Wisconsin Physicians Service",
-                "states": ["IL", "MI", "MN", "WI"],
-                "website": "https://www.wpsgha.com",
-                "description": "Jurisdiction N - Part A/B MAC"
-            },
-            "jurisdiction_p": {
-                "name": "Palmetto GBA",
-                "states": ["CA", "HI", "NV"],
-                "website": "https://www.palmettogba.com",
-                "description": "Jurisdiction P - Part A/B MAC"
-            },
-            "jurisdiction_r": {
-                "name": "Novitas Solutions",
-                "states": ["AR", "CO", "LA", "MS", "NM", "OK", "TX"],
-                "website": "https://www.novitas-solutions.com",
-                "description": "Jurisdiction R - Part A/B MAC"
-            },
-            "jurisdiction_s": {
-                "name": "Palmetto GBA",
-                "states": ["AZ", "MT", "ND", "SD", "UT", "WY"],
-                "website": "https://www.palmettogba.com",
-                "description": "Jurisdiction S - Part A/B MAC"
-            },
-            "jurisdiction_t": {
-                "name": "First Coast Service Options",
-                "states": ["FL", "PR", "VI"],
-                "website": "https://www.fcso.com",
-                "description": "Jurisdiction T - Part A/B MAC"
-            },
-            "jurisdiction_u": {
-                "name": "Noridian Healthcare Solutions",
-                "states": ["AK", "ID", "OR", "WA"],
-                "website": "https://med.noridianmedicare.com",
-                "description": "Jurisdiction U - Part A/B MAC"
-            },
-            "jurisdiction_v": {
-                "name": "Noridian Healthcare Solutions",
-                "states": ["CA"],
-                "website": "https://med.noridianmedicare.com",
-                "description": "Jurisdiction V - Part A/B MAC"
-            },
-            "jurisdiction_w": {
-                "name": "Noridian Healthcare Solutions",
-                "states": ["IA", "KS", "MO", "NE"],
-                "website": "https://med.noridianmedicare.com",
-                "description": "Jurisdiction W - Part A/B MAC"
-            },
-            "jurisdiction_x": {
-                "name": "Novitas Solutions",
-                "states": ["DE", "DC", "MD", "NJ", "PA"],
-                "website": "https://www.novitas-solutions.com",
-                "description": "Jurisdiction X - Part A/B MAC"
-            },
-            "jurisdiction_y": {
-                "name": "Novitas Solutions",
-                "states": ["NC", "SC", "VA", "WV"],
-                "website": "https://www.novitas-solutions.com",
-                "description": "Jurisdiction Y - Part A/B MAC"
-            },
-            "jurisdiction_z": {
-                "name": "Wisconsin Physicians Service",
-                "states": ["IL", "MI", "MN", "WI"],
-                "website": "https://www.wpsgha.com",
-                "description": "Jurisdiction Z - Part A/B MAC"
-            }
-        }
+        self.mac_jurisdictions = MAC_JURISDICTIONS
         
     def get_mac_jurisdiction(self, patient_state: str) -> Optional[Dict]:
         """
@@ -257,62 +138,9 @@ class EnhancedInsuranceAnalysis:
                 return last_part
             
             # Check if it's a full state name
-            state_mapping = {
-                'new york': 'NY',
-                'michigan': 'MI',
-                'connecticut': 'CT',
-                'california': 'CA',
-                'texas': 'TX',
-                'florida': 'FL',
-                'illinois': 'IL',
-                'pennsylvania': 'PA',
-                'ohio': 'OH',
-                'georgia': 'GA',
-                'north carolina': 'NC',
-                'virginia': 'VA',
-                'washington': 'WA',
-                'oregon': 'OR',
-                'colorado': 'CO',
-                'arizona': 'AZ',
-                'nevada': 'NV',
-                'utah': 'UT',
-                'montana': 'MT',
-                'wyoming': 'WY',
-                'idaho': 'ID',
-                'alaska': 'AK',
-                'hawaii': 'HI',
-                'new mexico': 'NM',
-                'oklahoma': 'OK',
-                'arkansas': 'AR',
-                'louisiana': 'LA',
-                'mississippi': 'MS',
-                'alabama': 'AL',
-                'tennessee': 'TN',
-                'kentucky': 'KY',
-                'indiana': 'IN',
-                'wisconsin': 'WI',
-                'minnesota': 'MN',
-                'iowa': 'IA',
-                'missouri': 'MO',
-                'kansas': 'KS',
-                'nebraska': 'NE',
-                'south dakota': 'SD',
-                'north dakota': 'ND',
-                'maine': 'ME',
-                'new hampshire': 'NH',
-                'vermont': 'VT',
-                'massachusetts': 'MA',
-                'rhode island': 'RI',
-                'new jersey': 'NJ',
-                'delaware': 'DE',
-                'maryland': 'MD',
-                'west virginia': 'WV',
-                'south carolina': 'SC'
-            }
-            
             state_lower = last_part.lower()
-            if state_lower in state_mapping:
-                return state_mapping[state_lower]
+            if state_lower in STATE_MAPPING:
+                return STATE_MAPPING[state_lower]
         
         return None
         
@@ -615,7 +443,7 @@ class EnhancedInsuranceAnalysis:
             return self._get_fallback_search_results(query)
         
         # Enhanced prompt for Medicare document search
-        search_prompt = self._create_medicare_search_prompt(query)
+        search_prompt = create_medicare_search_prompt(query)
         
         # Log the request details
         print(f"\n🔍 {self.gpt_model.upper()} SEARCH REQUEST:")
@@ -698,90 +526,7 @@ class EnhancedInsuranceAnalysis:
             print(f"⚠️  Search error - no real results available")
             return []
     
-    def _create_medicare_search_prompt(self, query: str) -> str:
-        """
-        Create a comprehensive search prompt for all Medicare document types and supporting documents.
-        """
-        
-        base_prompt = f"""
-        Search for medical policy documents related to: {query}
-        
-        IMPORTANT: Use REAL web search to find actual documents. Do NOT hallucinate or create fake URLs, titles, or sources. Only return results from real websites and documents that actually exist.
-        
-        COMPREHENSIVE SOURCE TYPES (in order of importance):
-        
-        PRIMARY MEDICARE DOCUMENTS:
-        1. Medicare National Coverage Determinations (NCDs) - site:cms.gov
-        2. Medicare Local Coverage Determinations (LCDs) - site:cms.gov  
-        3. Medicare Local Coverage Articles (LCAs) - site:cms.gov
-        4. Medicare Coverage Database (MCD) - site:cms.gov
-        5. Medicare Administrative Contractor (MAC) websites and policies
-        
-        MEDICARE ADVANTAGE DOCUMENTS:
-        6. Medicare Advantage medical policies and coverage determinations
-        7. Medicare Advantage clinical policies and utilization management
-        
-        CLINICAL AND EVIDENCE DOCUMENTS:
-        8. Clinical practice guidelines (NCCN, ASCO, etc.)
-        9. Evidence-based clinical studies and trials
-        10. Technology assessments and clinical evidence reviews
-        11. Medical necessity criteria and clinical rationale
-        
-        REGULATORY AND COMPLIANCE DOCUMENTS:
-        12. FDA approvals, clearances, and companion diagnostics
-        13. Regulatory requirements and compliance policies
-        14. Billing and coding guidelines
-        15. Documentation requirements and standards
-        
-        COST AND UTILIZATION DOCUMENTS:
-        16. Cost-effectiveness analyses and budget impact studies
-        17. Utilization management policies and reviews
-        18. Medical policy cost analyses
-        
-        PROFESSIONAL SOCIETY GUIDELINES:
-        19. NCCN Clinical Practice Guidelines
-        20. ASCO Clinical Practice Guidelines
-        21. Other professional society recommendations
-        
-        SEARCH FOCUS:
-        - Use REAL web search to find actual documents
-        - Prioritize official Medicare coverage policies (NCDs, LCDs, LCAs)
-        - Include Medicare Administrative Contractor specific policies
-        - Find clinical evidence and medical necessity criteria
-        - Search for FDA approvals and regulatory requirements
-        - Include professional society guidelines and recommendations
-        - Look for cost-effectiveness and utilization data
-        - Find billing and coding requirements
-        - Only return results from real, existing websites and documents
-        
-        Return results as a JSON array with fields: title, url, snippet, relevance (0-100), type, source.
-        
-        DOCUMENT TYPES TO USE:
-        - "ncd" for National Coverage Determinations
-        - "lcd" for Local Coverage Determinations  
-        - "lca" for Local Coverage Articles
-        - "mac_policy" for Medicare Administrative Contractor policies
-        - "medicare_advantage" for Medicare Advantage policies
-        - "clinical_guideline" for clinical practice guidelines
-        - "fda_document" for FDA approvals and clearances
-        - "clinical_study" for clinical trials and evidence
-        - "cost_analysis" for cost-effectiveness studies
-        - "utilization_policy" for utilization management
-        - "billing_guideline" for billing and coding requirements
-        - "regulatory_document" for regulatory requirements
-        - "policy_document" for other policy documents
-        - "coverage_determination" for coverage decisions
-        
-        CRITICAL REQUIREMENTS:
-        - Use REAL web search to find actual documents
-        - Do NOT create fake URLs, titles, or sources
-        - Only return results from real, existing websites
-        - Prioritize official sources: CMS.gov, MAC websites, FDA.gov, professional society websites
-        - Include both current and recent historical documents for comprehensive coverage analysis
-        - If no real results are found, return an empty array rather than fake data
-        """
-        
-        return base_prompt
+
     
     async def _parse_policy_document_with_gpt(self, session: aiohttp.ClientSession, search_result: Dict) -> Optional[Dict]:
         """
@@ -789,7 +534,7 @@ class EnhancedInsuranceAnalysis:
         """
         
         # Enhanced prompt for Medicare document analysis
-        prompt = self._create_medicare_document_analysis_prompt(search_result)
+        prompt = create_medicare_document_analysis_prompt(search_result)
         
         # Log the request details
         # For document parsing, we always use gpt-4o (not the search-preview model)
@@ -899,72 +644,7 @@ class EnhancedInsuranceAnalysis:
             print(f"Error in GPT-5 document parsing: {e}")
             return self._get_fallback_document_info(search_result)
     
-    def _create_medicare_document_analysis_prompt(self, search_result: Dict) -> str:
-        """
-        Create an optimized analysis prompt for Medicare documents.
-        """
-        
-        doc_type = search_result.get('type', 'Unknown')
-        title = search_result.get('title', 'Unknown')
-        url = search_result.get('url', 'N/A')
-        snippet = search_result.get('snippet', 'N/A')
-        
-        # Medicare-specific analysis instructions
-        if doc_type in ['ncd', 'lcd', 'lca']:
-            analysis_focus = f"""
-            This appears to be a Medicare {doc_type.upper()} document. Pay special attention to:
-            - Coverage criteria and medical necessity requirements
-            - Specific CPT/HCPCS codes covered
-            - Documentation requirements
-            - Clinical indications for coverage
-            - Limitations and exclusions
-            - Effective dates and revision history
-            """
-        else:
-            analysis_focus = """
-            Analyze this medical policy document for:
-            - Coverage criteria and requirements
-            - Medical necessity guidelines
-            - Documentation requirements
-            - Clinical indications
-            """
-        
-        prompt = f"""
-        Analyze this medical policy document and extract structured information:
-        
-        Document Title: {title}
-        URL: {url}
-        Document Type: {doc_type.upper() if doc_type in ['ncd', 'lcd', 'lca'] else 'Policy Document'}
-        Snippet: {snippet}
-        
-        {analysis_focus}
-        
-        Please extract the following information and return as JSON:
-        {{
-            "title": "document title",
-            "url": "document url",
-            "source": "source organization",
-            "document_type": "{doc_type}",
-            "requirements": ["list of specific requirements"],
-            "evidence_basis": "clinical evidence or rationale",
-            "clinical_criteria": ["list of clinical criteria"],
-            "coverage_status": "covered/not covered/prior authorization required",
-            "cpt_codes": ["relevant CPT codes"],
-            "documentation_needed": ["list of required documentation"],
-            "limitations": ["coverage limitations or exclusions"],
-            "effective_date": "document effective date if available",
-            "revision_date": "last revision date if available"
-        }}
-        
-        For Medicare documents, be especially thorough in extracting:
-        - Specific coverage criteria
-        - Medical necessity requirements
-        - Required documentation
-        - Clinical indications
-        - Limitations and exclusions
-        """
-        
-        return prompt
+
     
     async def _analyze_coverage_and_requirements_with_gpt(
         self, 
@@ -980,7 +660,7 @@ class EnhancedInsuranceAnalysis:
         """
         
         # Enhanced analysis prompt for Medicare documents
-        prompt = self._create_medicare_analysis_prompt(
+        prompt = create_medicare_analysis_prompt(
             cpt_code, insurance_provider, policy_documents, patient_context, mac_jurisdiction
         )
         
@@ -1026,80 +706,7 @@ class EnhancedInsuranceAnalysis:
             print(f"Error in {self.gpt_model} analysis: {e}")
             return self._get_fallback_analysis(cpt_code, insurance_provider, policy_documents, mac_jurisdiction)
     
-    def _create_medicare_analysis_prompt(
-        self, 
-        cpt_code: str, 
-        insurance_provider: str, 
-        policy_documents: List[Dict],
-        patient_context: Optional[Dict] = None,
-        mac_jurisdiction: Optional[Dict] = None
-    ) -> str:
-        """
-        Create an enhanced analysis prompt for Medicare documents.
-        """
-        
-        # Check if any documents are Medicare-specific
-        has_medicare_docs = any(
-            doc.get('document_type') in ['ncd', 'lcd', 'lca'] 
-            for doc in policy_documents
-        )
-        
-        medicare_focus = ""
-        if has_medicare_docs:
-            medicare_focus = """
-            MEDICARE DOCUMENT ANALYSIS FOCUS:
-            - Prioritize NCDs over LCDs (NCDs are nationwide, LCDs are local)
-            - Consider LCDs only if no applicable NCD exists
-            - Pay attention to Medicare Administrative Contractor (MAC) jurisdictions
-            - Include Medicare-specific requirements and limitations
-            - Consider Medicare medical necessity criteria
-            """
-        
-        prompt = f"""
-        Analyze the following medical policy documents for CPT code {cpt_code} and insurance provider {insurance_provider}:
-        
-        Policy Documents:
-        {json.dumps(policy_documents, indent=2)}
-        
-        Patient Context:
-        {json.dumps(patient_context or {}, indent=2)}
-        
-        MAC Jurisdiction:
-        {json.dumps(mac_jurisdiction or {}, indent=2)}
-        
-        {medicare_focus}
-        
-        Please provide a comprehensive analysis and return as JSON:
-        {{
-            "coverage_status": "covered/not covered/prior authorization required",
-            "coverage_details": "detailed explanation of coverage",
-            "requirements": [
-                {{
-                    "requirement_type": "specific requirement name",
-                    "description": "detailed description",
-                    "evidence_basis": "clinical evidence or rationale",
-                    "documentation_needed": ["list of required documents"],
-                    "clinical_criteria": ["list of clinical criteria"],
-                    "source_document": "source document title",
-                    "confidence_score": 0.9
-                }}
-            ],
-            "confidence_score": 0.95,
-            "key_findings": ["list of key findings"],
-            "recommendations": ["list of recommendations"],
-            "medicare_specific": {{
-                "ncd_applicable": true/false,
-                "lcd_applicable": true/false,
-                "mac_jurisdiction": "MAC jurisdiction if applicable",
-                "medicare_limitations": ["Medicare-specific limitations"]
-            }}
-        }}
-        
-        Focus on extracting specific requirements, clinical criteria, and providing actionable recommendations.
-        For Medicare documents, ensure compliance with Medicare policies and requirements.
-        """
-        
-        return prompt
+
     
     def _parse_gpt4_search_response(self, response, query: str) -> List[Dict]:
         """
@@ -1524,23 +1131,7 @@ class EnhancedInsuranceAnalysis:
             for req in requirements
         ])
         
-        prompt = f"""
-        Check if the patient meets the following insurance requirements:
-        
-        Requirements:
-        {requirements_text}
-        
-        Patient Context:
-        {json.dumps(patient_context, indent=2)}
-        
-        Return a JSON object mapping each requirement to true/false:
-        {{
-            "requirement_name": true/false,
-            "requirement_name": true/false
-        }}
-        
-        Consider the patient context carefully and be conservative in your assessment.
-        """
+        prompt = create_criteria_matching_prompt(requirements_text, patient_context)
         
         try:
             import asyncio
@@ -1621,29 +1212,7 @@ class EnhancedInsuranceAnalysis:
         """
         
         # Create recommendations prompt
-        unmet_criteria = [req for req, met in patient_criteria_match.items() if not met]
-        
-        prompt = f"""
-        Generate actionable recommendations for a prior authorization request based on the following information:
-        
-        Coverage Status: {coverage_info.coverage_status}
-        Coverage Details: {coverage_info.coverage_details}
-        
-        Requirements:
-        {chr(10).join([f"- {req.requirement_type}: {req.description}" for req in coverage_info.requirements])}
-        
-        Patient Criteria Match:
-        {json.dumps(patient_criteria_match, indent=2)}
-        
-        Unmet Criteria:
-        {unmet_criteria if unmet_criteria else "All criteria met"}
-        
-        Patient Context:
-        {json.dumps(patient_context or {}, indent=2)}
-        
-        Provide 5-7 specific, actionable recommendations for completing the prior authorization request.
-        Return as a JSON array of strings.
-        """
+        prompt = create_recommendations_prompt(coverage_info, patient_criteria_match, patient_context)
         
         try:
             import asyncio
@@ -1726,40 +1295,27 @@ class EnhancedInsuranceAnalysis:
     
     def _get_fallback_document_info(self, search_result: Dict) -> Dict:
         """Fallback document information when GPT-5 is not available"""
-        return {
-            "title": search_result.get("title", ""),
-            "url": search_result.get("url", ""),
-            "source": search_result.get("source", "Unknown"),
-            "requirements": [
-                "Genetic counselor consultation required",
-                "Family history documentation",
-                "Clinical indication documentation",
-                "Provider credentials verification"
-            ],
-            "evidence_basis": "Based on clinical studies and medical literature",
-            "clinical_criteria": [
-                "High-risk patient population",
-                "Appropriate clinical indication",
-                "Qualified provider"
-            ],
-            "coverage_status": "Covered with prior authorization",
-            "cpt_codes": [],
-            "documentation_needed": []
-        }
+        doc_info = DEFAULT_DOCUMENT_INFO.copy()
+        doc_info["title"] = search_result.get("title", "")
+        doc_info["url"] = search_result.get("url", "")
+        doc_info["source"] = search_result.get("source", "Unknown")
+        return doc_info
     
     def _get_fallback_analysis(self, cpt_code: str, insurance_provider: str, policy_documents: List[Dict], mac_jurisdiction: Optional[Dict]) -> CoverageAnalysis:
         """Fallback analysis when GPT-5 is not available"""
-        requirements = [
-            InsuranceRequirement(
-                requirement_type="Genetic counselor consultation required",
-                description="Requirement for genetic counselor consultation",
-                evidence_basis="Based on clinical studies and medical literature",
-                documentation_needed=["Genetic counselor consultation documentation"],
-                clinical_criteria=["High-risk patient population", "Appropriate clinical indication"],
-                source_document="Medical Policy Document",
-                confidence_score=0.9
+        # Convert default requirements to InsuranceRequirement objects
+        requirements = []
+        for req_data in DEFAULT_REQUIREMENTS:
+            requirement = InsuranceRequirement(
+                requirement_type=req_data["requirement_type"],
+                description=req_data["description"],
+                evidence_basis=req_data["evidence_basis"],
+                documentation_needed=req_data["documentation_needed"],
+                clinical_criteria=req_data["clinical_criteria"],
+                source_document=req_data["source_document"],
+                confidence_score=req_data["confidence_score"]
             )
-        ]
+            requirements.append(requirement)
         
         return CoverageAnalysis(
             cpt_code=cpt_code,
@@ -1770,7 +1326,7 @@ class EnhancedInsuranceAnalysis:
             patient_criteria_match={},
             confidence_score=0.8,
             search_sources=[],
-            recommendations=self._get_default_recommendations(),
+            recommendations=DEFAULT_RECOMMENDATIONS,
             mac_jurisdiction=mac_jurisdiction["name"] if mac_jurisdiction else None,
             ncd_applicable=False,
             lcd_applicable=False
@@ -1778,32 +1334,13 @@ class EnhancedInsuranceAnalysis:
     
     def _get_fallback_criteria_match(self, requirements: List[InsuranceRequirement], patient_context: Dict) -> Dict[str, bool]:
         """Fallback criteria matching when GPT-5 is not available"""
-        criteria_match = {}
-        for req in requirements:
-            if "genetic counselor" in req.requirement_type.lower():
-                criteria_match[req.requirement_type] = patient_context.get('has_genetic_counseling', False)
-            elif "family history" in req.requirement_type.lower():
-                criteria_match[req.requirement_type] = patient_context.get('has_family_history', False)
-            elif "clinical indication" in req.requirement_type.lower():
-                criteria_match[req.requirement_type] = patient_context.get('has_clinical_indication', True)
-            elif "provider credentials" in req.requirement_type.lower():
-                criteria_match[req.requirement_type] = patient_context.get('provider_credentials_valid', True)
-            else:
-                criteria_match[req.requirement_type] = True
-        return criteria_match
+        return get_default_criteria_match(requirements, patient_context)
     
     def _get_fallback_recommendations(self, coverage_info: CoverageAnalysis, patient_criteria_match: Dict[str, bool]) -> List[str]:
         """Fallback recommendations when GPT-5 is not available"""
-        return self._get_default_recommendations()
+        return DEFAULT_RECOMMENDATIONS
     
-    def _get_default_recommendations(self) -> List[str]:
-        """Default recommendations"""
-        return [
-            "Ensure all required documentation is complete and current",
-            "Verify provider credentials and network participation",
-            "Include clinical justification for the requested service",
-            "Submit prior authorization request with all supporting documentation"
-        ]
+
     
     def _deduplicate_results(self, results: List[Dict]) -> List[Dict]:
         """Remove duplicate search results"""
@@ -1846,7 +1383,7 @@ class EnhancedInsuranceAnalysis:
                 }
             
             # Create prompt for parsing agent
-            prompt = self._create_parsing_agent_prompt(relevant_docs, patient_context, cpt_code, insurance_provider)
+            prompt = create_parsing_agent_prompt(relevant_docs, patient_context, cpt_code, insurance_provider)
             
             # Call GPT-5 for analysis
             response = await self._call_gpt5_direct(prompt)
@@ -1907,119 +1444,7 @@ class EnhancedInsuranceAnalysis:
             print(f"Error in GPT-5 direct call: {e}")
             return None
     
-    def _create_parsing_agent_prompt(self, relevant_docs: List[Dict], patient_context: Dict, cpt_code: str, insurance_provider: str) -> str:
-        """
-        Create prompt for the parsing agent to analyze documents and validate requests.
-        """
-        # Extract document content for analysis
-        doc_content = []
-        for doc in relevant_docs[:5]:  # Limit to top 5 most relevant
-            doc_content.append(f"""
-Document: {doc.get('title', 'Unknown')}
-URL: {doc.get('url', 'N/A')}
-Type: {doc.get('type', 'Unknown')}
-Relevance: {doc.get('relevance', 0)}%
-Content: {doc.get('snippet', 'No content available')}
-""")
-        
-        # Create patient context summary
-        patient_summary = f"""
-Patient Context:
-- CPT Code: {cpt_code}
-- Insurance Provider: {insurance_provider}
-- Has Genetic Counseling: {patient_context.get('has_genetic_counseling', False)}
-- Has Family History: {patient_context.get('has_family_history', False)}
-- Has Clinical Indication: {patient_context.get('has_clinical_indication', True)}
-- Provider Credentials Valid: {patient_context.get('provider_credentials_valid', True)}
-- Patient State: {patient_context.get('patient_state', 'Unknown')}
-"""
-        
-        prompt = f"""
-You are a medical insurance parsing agent analyzing policy documents for prior authorization requests. 
 
-TASK: Analyze the provided policy documents and patient context to:
-
-1. **Extract Critical Requirements Checklist**: Identify all critical requirements for coverage approval
-2. **Validate PA Request**: Check if the clinician's request is valid based on available documentation
-3. **Identify Missing Documents**: If request is invalid, identify what additional documents are needed
-4. **Create Requirements Checklist**: Generate a comprehensive checklist for determination
-5. **Extract Medical Knowledge**: Identify relevant medical knowledge and evidence from the documents
-
-DOCUMENTS TO ANALYZE:
-{chr(10).join(doc_content)}
-
-PATIENT CONTEXT:
-{patient_summary}
-
-ANALYSIS REQUIREMENTS:
-
-1. **Critical Requirements Checklist**:
-   - List each critical requirement with specific criteria
-   - Include documentation requirements
-   - Specify clinical criteria that must be met
-
-2. **Request Validation**:
-   - Determine if the PA request is valid based on available information
-   - Check if all required documentation is present
-   - Identify any gaps in the request
-
-3. **Missing Documents** (if request is invalid):
-   - List specific documents or information needed
-   - Explain why each document is required
-   - Provide guidance on how to obtain missing information
-
-4. **Requirements Checklist for Determination**:
-   - Create a comprehensive checklist for the determination process
-   - Include both clinical and administrative requirements
-   - Specify evidence requirements for each item
-
-5. **Medical Knowledge from Evidence**:
-   - Extract relevant medical knowledge from the policy documents
-   - Identify clinical evidence mentioned in the documents
-   - Note any specific medical criteria or guidelines
-
-RESPONSE FORMAT (JSON):
-{{
-    "critical_requirements": [
-        {{
-            "requirement": "string",
-            "criteria": "string",
-            "documentation_needed": "string",
-            "clinical_criteria": "string"
-        }}
-    ],
-    "request_validation": {{
-        "is_valid": boolean,
-        "missing_documents": ["string"],
-        "validation_notes": "string"
-    }},
-    "clinician_message": "string (message to clinician if request is invalid)",
-    "requirements_checklist": [
-        {{
-            "category": "string",
-            "items": [
-                {{
-                    "requirement": "string",
-                    "evidence_required": "string",
-                    "notes": "string"
-                }}
-            ]
-        }}
-    ],
-    "medical_knowledge": [
-        {{
-            "topic": "string",
-            "evidence": "string",
-            "source_document": "string",
-            "relevance": "string"
-        }}
-    ]
-}}
-
-Analyze the documents thoroughly and provide a comprehensive response following the JSON format above.
-"""
-        
-        return prompt
     
     def _parse_parsing_agent_response(self, response, relevant_docs: List[Dict]) -> Dict:
         """
@@ -2101,42 +1526,7 @@ Analyze the documents thoroughly and provide a comprehensive response following 
         """
         Create a fallback result when parsing agent fails.
         """
-        return {
-            'critical_requirements': [
-                {
-                    'requirement': 'Medical necessity documentation',
-                    'criteria': 'Clinical indication must be documented',
-                    'documentation_needed': 'Physician notes and clinical documentation',
-                    'clinical_criteria': 'Appropriate clinical indication'
-                }
-            ],
-            'request_validation': {
-                'is_valid': True,
-                'missing_documents': [],
-                'validation_notes': 'Basic validation completed'
-            },
-            'clinician_message': 'Request appears valid. Please ensure all clinical documentation is complete.',
-            'requirements_checklist': [
-                {
-                    'category': 'Clinical Requirements',
-                    'items': [
-                        {
-                            'requirement': 'Medical necessity',
-                            'evidence_required': 'Clinical documentation',
-                            'notes': 'Must demonstrate appropriate clinical indication'
-                        }
-                    ]
-                }
-            ],
-            'medical_knowledge': [
-                {
-                    'topic': 'General coverage',
-                    'evidence': 'Standard medical necessity criteria apply',
-                    'source_document': 'Policy guidelines',
-                    'relevance': 'Standard'
-                }
-            ]
-        }
+        return DEFAULT_PARSING_RESULT
 
 # Global instance
 enhanced_insurance_analyzer = EnhancedInsuranceAnalysis()
