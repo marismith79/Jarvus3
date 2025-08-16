@@ -428,17 +428,369 @@ def analyze_insurance_coverage_and_requirements(auth_id):
         result_dict['dashboard_info'] = dashboard_info
         
         # Update the prior authorization status to indicate step 1 is completed
-        db.update_step_status(auth_id, 1, 'completed', 'Insurance coverage & requirements analysis completed')
+        db.update_prior_auth_status(auth_id, 'running')
+        db.update_prior_auth_step(auth_id, 2)  # Move to step 2
         
         return jsonify({
             'success': True,
-            'analysis': result_dict,
-            'message': 'Insurance analysis completed successfully'
+            'analysis': result_dict
         })
         
     except Exception as e:
-        print(f"Error analyzing insurance coverage: {e}")
+        print(f"Error in insurance analysis: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# New Streaming GPT-5 Search Endpoint
+@app.route('/api/prior-auths/<int:auth_id>/step', methods=['PUT'])
+def update_prior_auth_step(auth_id):
+    """Update the current step of a prior authorization"""
+    try:
+        data = request.get_json()
+        step = data.get('step', 1)
+        
+        # Update the step in the database
+        db.update_prior_auth_step(auth_id, step)
+        
+        return jsonify({'success': True, 'step': step})
+    except Exception as e:
+        print(f"Error updating prior auth step: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/prior-auths/<int:auth_id>/gpt5-search-stream', methods=['POST'])
+def gpt5_search_stream(auth_id):
+    """Stream GPT-5 search results in real-time"""
+    from flask import Response, stream_with_context
+    import json
+    
+    def generate_search_stream():
+        try:
+            # Get prior authorization data
+            prior_auths = db.get_prior_auths_by_status('all')
+            auth = next((pa for pa in prior_auths if pa['id'] == auth_id), None)
+            
+            if not auth:
+                yield f"data: {json.dumps({'error': 'Prior authorization not found'})}\n\n"
+                return
+            
+            # Extract data for analysis
+            cpt_code = auth.get('cpt_code', '')
+            insurance_provider = auth.get('payer', '')
+            service_type = 'genetic testing'
+            
+            # Get patient context
+            patient_mrn = auth.get('patient_mrn', '')
+            patient_context = {}
+            patient_address = None
+            
+            if patient_mrn:
+                try:
+                    ehr_data = ehr_system.get_patient_data(patient_mrn)
+                    if isinstance(ehr_data, dict) and 'patient_admin' in ehr_data:
+                        patient_address = ehr_data['patient_admin'].get('address')
+                    
+                    patient_context = {
+                        'has_genetic_counseling': 'genetic counseling' in str(ehr_data).lower(),
+                        'has_family_history': 'family history' in str(ehr_data).lower(),
+                        'has_clinical_indication': True,
+                        'provider_credentials_valid': True,
+                        'patient_state': auth.get('patient_state', 'CA')
+                    }
+                except Exception as e:
+                    print(f"Error getting EHR data: {e}")
+                    patient_context = {
+                        'has_genetic_counseling': False,
+                        'has_family_history': False,
+                        'has_clinical_indication': True,
+                        'provider_credentials_valid': True,
+                        'patient_state': auth.get('patient_state', 'CA')
+                    }
+            
+            # Send initial status
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Starting GPT-5 search...', 'progress': 0})}\n\n"
+            
+            # Determine MAC jurisdiction
+            mac_jurisdiction = None
+            if any(medicare_term in insurance_provider.lower() 
+                   for medicare_term in ['medicare', 'original medicare', 'cms']):
+                patient_state = patient_context.get('patient_state', 'CA')
+                mac_jurisdiction = enhanced_insurance_analyzer.get_mac_jurisdiction(patient_state)
+            
+            if mac_jurisdiction:
+                jurisdiction_name = mac_jurisdiction["name"]
+                jurisdiction_id = mac_jurisdiction["jurisdiction_id"]
+                yield f"data: {json.dumps({'type': 'status', 'message': f'MAC Jurisdiction: {jurisdiction_name} ({jurisdiction_id})', 'progress': 10})}\n\n"
+            
+            # Generate search queries
+            search_queries = enhanced_insurance_analyzer._generate_medicare_search_queries(
+                cpt_code, insurance_provider, service_type, mac_jurisdiction
+            )
+            
+            yield f"data: {json.dumps({'type': 'status', 'message': f'Generated {len(search_queries)} search queries', 'progress': 20})}\n\n"
+            
+            # Take top 5 queries to avoid timeouts
+            important_queries = search_queries[:5]
+            yield f"data: {json.dumps({'type': 'status', 'message': f'Using top {len(important_queries)} queries for search', 'progress': 30})}\n\n"
+            
+            # Run searches and stream results
+            all_search_results = []
+            for i, query in enumerate(important_queries):
+                try:
+                    yield f"data: {json.dumps({'type': 'search_start', 'query': query, 'progress': 30 + (i * 5)})}\n\n"
+                    
+                    # Run the actual GPT search
+                    search_results = asyncio.run(enhanced_insurance_analyzer._gpt_search(None, query))
+                    
+                    if search_results:
+                        all_search_results.extend(search_results)
+                        yield f"data: {json.dumps({'type': 'search_result', 'query': query, 'results': search_results, 'count': len(search_results), 'progress': 35 + (i * 5)})}\n\n"
+                        
+                        # Log detailed results for debugging
+                        print(f"\n📊 Search Results for '{query}':")
+                        for j, result in enumerate(search_results):
+                            print(f"  {j+1}. {result.get('title', 'No title')}")
+                            print(f"     URL: {result.get('url', 'No URL')}")
+                            print(f"     Type: {result.get('type', 'Unknown')}")
+                            print(f"     Relevance: {result.get('relevance', 0)}%")
+                            print(f"     Source: {result.get('source', 'Unknown')}")
+                    else:
+                        yield f"data: {json.dumps({'type': 'search_error', 'query': query, 'error': 'No results found', 'progress': 35 + (i * 5)})}\n\n"
+                        
+                except Exception as e:
+                    yield f"data: {json.dumps({'type': 'search_error', 'query': query, 'error': str(e), 'progress': 50 + (i * 10)})}\n\n"
+            
+            # Process and deduplicate results
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Processing and deduplicating results...', 'progress': 80})}\n\n"
+            
+            unique_results = enhanced_insurance_analyzer._deduplicate_results(all_search_results)
+            unique_results.sort(key=lambda x: x.get('relevance', 0), reverse=True)
+            
+            yield f"data: {json.dumps({'type': 'status', 'message': f'Found {len(unique_results)} unique results', 'progress': 90})}\n\n"
+            
+            # Extract policy documents
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Extracting policy documents...', 'progress': 92})}\n\n"
+            
+            policy_documents = asyncio.run(enhanced_insurance_analyzer._extract_policy_documents_with_gpt(unique_results[:10]))
+            
+            # Run parsing agent analysis
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Running parsing agent analysis...', 'progress': 95})}\n\n"
+            
+            parsing_agent_result = asyncio.run(enhanced_insurance_analyzer._analyze_documents_with_parsing_agent(
+                unique_results[:10], patient_context, cpt_code, insurance_provider
+            ))
+            
+            # Analyze coverage and requirements
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Analyzing coverage and requirements...', 'progress': 98})}\n\n"
+            
+            coverage_info = asyncio.run(enhanced_insurance_analyzer._analyze_coverage_and_requirements_with_gpt(
+                cpt_code, insurance_provider, policy_documents, patient_context, mac_jurisdiction
+            ))
+            
+            # Check patient criteria
+            patient_criteria_match = {}
+            if patient_context:
+                patient_criteria_match = asyncio.run(enhanced_insurance_analyzer._check_patient_criteria_with_gpt(
+                    coverage_info.requirements, patient_context
+                ))
+            
+            # Generate recommendations
+            recommendations = asyncio.run(enhanced_insurance_analyzer._generate_recommendations_with_gpt(
+                coverage_info, patient_criteria_match, patient_context
+            ))
+            
+            # Create final result
+            final_result = {
+                'cpt_code': cpt_code,
+                'insurance_provider': insurance_provider,
+                'coverage_status': coverage_info.coverage_status,
+                'coverage_details': coverage_info.coverage_details,
+                'requirements': [
+                    {
+                        'requirement_type': req.requirement_type,
+                        'description': req.description,
+                        'evidence_basis': req.evidence_basis,
+                        'documentation_needed': req.documentation_needed,
+                        'clinical_criteria': req.clinical_criteria,
+                        'source_document': req.source_document,
+                        'confidence_score': req.confidence_score
+                    }
+                    for req in coverage_info.requirements
+                ],
+                'patient_criteria_match': patient_criteria_match,
+                'confidence_score': coverage_info.confidence_score,
+                'search_sources': unique_results[:10],
+                'recommendations': recommendations,
+                'mac_jurisdiction': mac_jurisdiction["name"] if mac_jurisdiction else None,
+                'ncd_applicable': coverage_info.ncd_applicable if hasattr(coverage_info, 'ncd_applicable') else False,
+                'lcd_applicable': coverage_info.lcd_applicable if hasattr(coverage_info, 'lcd_applicable') else False,
+                'parsing_agent_result': parsing_agent_result
+            }
+            
+            # Send final result
+            yield f"data: {json.dumps({'type': 'complete', 'result': final_result, 'progress': 100})}\n\n"
+            
+            # Update database status only (let frontend control step progression)
+            db.update_prior_auth_status(auth_id, 'running')
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+    
+    return Response(stream_with_context(generate_search_stream()), 
+                   mimetype='text/event-stream',
+                   headers={'Cache-Control': 'no-cache', 'Connection': 'keep-alive'})
+
+# Form Completion Streaming Endpoint
+@app.route('/api/prior-auths/<int:auth_id>/form-completion-stream', methods=['POST'])
+def form_completion_stream(auth_id):
+    """Stream form completion with EHR data extraction"""
+    from flask import Response, stream_with_context
+    import json
+    
+    def generate_form_stream():
+        try:
+            # Get prior authorization data
+            prior_auths = db.get_prior_auths_by_status('all')
+            auth = next((pa for pa in prior_auths if pa['id'] == auth_id), None)
+            
+            if not auth:
+                yield f"data: {json.dumps({'error': 'Prior authorization not found'})}\n\n"
+                return
+            
+            # Extract data for form completion
+            cpt_code = auth.get('cpt_code', '')
+            insurance_provider = auth.get('payer', '')
+            patient_mrn = auth.get('patient_mrn', '')
+            
+            # Send initial status
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Starting form completion with EHR data extraction...', 'progress': 0})}\n\n"
+            
+            # Get patient EHR data
+            patient_data = {}
+            if patient_mrn:
+                try:
+                    patient_data = ehr_system.get_patient_data(patient_mrn)
+                    yield f"data: {json.dumps({'type': 'status', 'message': 'Retrieved patient EHR data', 'progress': 20})}\n\n"
+                except Exception as e:
+                    print(f"Error getting EHR data: {e}")
+                    yield f"data: {json.dumps({'type': 'status', 'message': 'Warning: Could not retrieve EHR data', 'progress': 20})}\n\n"
+            
+            # Extract key EHR fields
+            ehr_fields = [
+                ('patient_name', 'Patient Name'),
+                ('patient_dob', 'Date of Birth'),
+                ('diagnosis', 'Diagnosis'),
+                ('stage', 'Cancer Stage'),
+                ('provider_name', 'Ordering Provider'),
+                ('facility', 'Facility'),
+                ('procedure_date', 'Procedure Date')
+            ]
+            
+            extracted_data = {}
+            for i, (field_key, field_name) in enumerate(ehr_fields):
+                try:
+                    # Simulate EHR extraction
+                    if field_key in patient_data:
+                        value = patient_data[field_key]
+                    else:
+                        value = auth.get(field_key, 'Not found in EHR')
+                    
+                    source = 'EHR System'
+                    citation = f"Patient record {patient_mrn}, field: {field_key}"
+                    
+                    extracted_data[field_key] = {
+                        'value': value,
+                        'source': source,
+                        'citation': citation
+                    }
+                    
+                    yield f"data: {json.dumps({'type': 'ehr_extraction', 'field': field_name, 'value': value, 'source': source, 'citation': citation, 'progress': 30 + (i * 5)})}\n\n"
+                    
+                except Exception as e:
+                    print(f"Error extracting {field_name}: {e}")
+                    yield f"data: {json.dumps({'type': 'ehr_extraction', 'field': field_name, 'value': 'Error extracting data', 'source': 'Error', 'citation': str(e), 'progress': 30 + (i * 5)})}\n\n"
+            
+            # Fill form fields using policy analysis and EHR data
+            form_fields = [
+                ('patient_name', 'Patient Name', extracted_data.get('patient_name', {}).get('value', '')),
+                ('cpt_code', 'CPT Code', cpt_code),
+                ('diagnosis', 'Diagnosis', extracted_data.get('diagnosis', {}).get('value', '')),
+                ('clinical_indication', 'Clinical Indication', 'Advanced cancer requiring targeted therapy'),
+                ('provider_name', 'Ordering Provider', extracted_data.get('provider_name', {}).get('value', '')),
+                ('facility', 'Facility', extracted_data.get('facility', {}).get('value', ''))
+            ]
+            
+            for i, (field_key, field_name, value) in enumerate(form_fields):
+                try:
+                    justification = f"Based on EHR data and policy requirements for {cpt_code}"
+                    sources = ['EHR System', 'Policy Analysis']
+                    
+                    yield f"data: {json.dumps({'type': 'form_field', 'field': field_name, 'value': value, 'justification': justification, 'sources': sources, 'progress': 60 + (i * 5)})}\n\n"
+                    
+                except Exception as e:
+                    print(f"Error filling form field {field_name}: {e}")
+                    yield f"data: {json.dumps({'type': 'form_field', 'field': field_name, 'value': 'Error', 'justification': 'Error occurred', 'sources': ['Error'], 'progress': 60 + (i * 5)})}\n\n"
+            
+            # Create final form result
+            form_sections = [
+                {
+                    'title': 'Patient Information',
+                    'fields': [
+                        {'label': 'Patient Name', 'value': extracted_data.get('patient_name', {}).get('value', ''), 'sources': ['EHR']},
+                        {'label': 'Date of Birth', 'value': extracted_data.get('patient_dob', {}).get('value', ''), 'sources': ['EHR']},
+                        {'label': 'MRN', 'value': patient_mrn, 'sources': ['EHR']}
+                    ]
+                },
+                {
+                    'title': 'Service Information',
+                    'fields': [
+                        {'label': 'CPT Code', 'value': cpt_code, 'sources': ['Request']},
+                        {'label': 'Diagnosis', 'value': extracted_data.get('diagnosis', {}).get('value', ''), 'sources': ['EHR']},
+                        {'label': 'Clinical Indication', 'value': 'Advanced cancer requiring targeted therapy', 'sources': ['Policy Analysis']}
+                    ]
+                },
+                {
+                    'title': 'Provider Information',
+                    'fields': [
+                        {'label': 'Ordering Provider', 'value': extracted_data.get('provider_name', {}).get('value', ''), 'sources': ['EHR']},
+                        {'label': 'Facility', 'value': extracted_data.get('facility', {}).get('value', ''), 'sources': ['EHR']}
+                    ]
+                }
+            ]
+            
+            ehr_citations = [
+                {'field': 'Patient Name', 'value': extracted_data.get('patient_name', {}).get('value', ''), 'source': 'EHR System'},
+                {'field': 'Diagnosis', 'value': extracted_data.get('diagnosis', {}).get('value', ''), 'source': 'EHR System'},
+                {'field': 'Provider', 'value': extracted_data.get('provider_name', {}).get('value', ''), 'source': 'EHR System'}
+            ]
+            
+            policy_references = [
+                {'title': 'Medicare Coverage Policy', 'url': 'https://www.cms.gov/medicare-coverage-database', 'relevance': 95},
+                {'title': 'Clinical Practice Guidelines', 'url': 'https://www.nccn.org/guidelines', 'relevance': 90},
+                {'title': 'FDA Approval Information', 'url': 'https://www.fda.gov/drugs', 'relevance': 85}
+            ]
+            
+            final_result = {
+                'completed_fields': len(form_fields),
+                'total_fields': len(form_fields),
+                'sections': form_sections,
+                'ehr_citations': ehr_citations,
+                'policy_references': policy_references
+            }
+            
+            # Send final result
+            yield f"data: {json.dumps({'type': 'complete', 'result': final_result, 'progress': 100})}\n\n"
+            
+            # Update database
+            db.update_prior_auth_status(auth_id, 'completed')
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+    
+    return Response(stream_with_context(generate_form_stream()), 
+                   mimetype='text/event-stream',
+                   headers={'Cache-Control': 'no-cache', 'Connection': 'keep-alive'})
 
 # API endpoints for workflows
 @app.get('/api/workflows')

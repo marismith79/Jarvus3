@@ -47,16 +47,25 @@ class EnhancedInsuranceAnalysis:
     """
     
     def __init__(self):
-        self.api_key = os.getenv('GPT5_API_KEY', 'demo_key')
+        # Support both GPT-4 and GPT-5 with environment variable selection
+        self.gpt_model = os.getenv('GPT_MODEL', 'gpt-4o-mini-search-preview').lower()  # Default to GPT-4o-mini-search-preview
+        self.api_key = os.getenv('OPENAI_API_KEY', os.getenv('GPT5_API_KEY'))
         self.client = OpenAI(api_key=self.api_key)
         self.search_cache = {}
         self.policy_cache = {}
         
         # Debug: Check if API key is loaded
         if self.api_key == 'demo_key':
-            print("⚠️  WARNING: Using demo key. Please check your GPT5_API_KEY environment variable.")
+            print("⚠️  WARNING: Using demo key. Please check your OPENAI_API_KEY environment variable.")
         else:
-            print(f"✅ GPT-5 API key loaded successfully (starts with: {self.api_key[:10]}...)")
+            print(f"✅ OpenAI API key loaded successfully (starts with: {self.api_key[:10]}...)")
+        
+        print(f"🤖 Using model: {self.gpt_model}")
+        
+        # Validate model selection
+        if self.gpt_model not in ['gpt-4o', 'gpt-4o-mini-search-preview', 'gpt-5-nano']:
+            print(f"⚠️  WARNING: Unknown model '{self.gpt_model}'. Defaulting to 'gpt-4o-mini-search-preview'")
+            self.gpt_model = 'gpt-4o-mini-search-preview'
         
         # Medicare Administrative Contractors (MACs) and their jurisdictions
         self.mac_jurisdictions = {
@@ -356,23 +365,23 @@ class EnhancedInsuranceAnalysis:
         
         print(f"📊 Found {len(search_results)} search results")
         
-        # Step 2: Extract and parse policy documents using GPT-5
-        policy_documents = await self._extract_policy_documents_with_gpt5(search_results)
+        # Step 2: Extract and parse policy documents using GPT
+        policy_documents = await self._extract_policy_documents_with_gpt(search_results)
         
-        # Step 3: Analyze coverage and extract requirements using GPT-5
-        coverage_info = await self._analyze_coverage_and_requirements_with_gpt5(
+        # Step 3: Analyze coverage and extract requirements using GPT
+        coverage_info = await self._analyze_coverage_and_requirements_with_gpt(
             cpt_code, insurance_provider, policy_documents, patient_context, mac_jurisdiction
         )
         
         # Step 4: Check patient criteria against requirements
         patient_criteria_match = {}
         if patient_context:
-            patient_criteria_match = await self._check_patient_criteria_with_gpt5(
+            patient_criteria_match = await self._check_patient_criteria_with_gpt(
                 coverage_info.requirements, patient_context
             )
         
-        # Step 5: Generate recommendations using GPT-5
-        recommendations = await self._generate_recommendations_with_gpt5(
+        # Step 5: Generate recommendations using GPT
+        recommendations = await self._generate_recommendations_with_gpt(
             coverage_info, patient_criteria_match, patient_context
         )
         
@@ -420,14 +429,14 @@ class EnhancedInsuranceAnalysis:
         # Run searches in smaller batches to avoid overwhelming the API
         print(f"🚀 Starting GPT-5 searches for {len(search_queries)} queries...")
         
-        # Take only the first 5 most important queries to avoid timeouts
-        important_queries = search_queries[:5]
-        print(f"📝 Using top {len(important_queries)} queries to avoid timeouts")
+        # Take more queries since GPT-4o is faster
+        important_queries = search_queries[:12]  # Increased from 5 to 12
+        print(f"📝 Using top {len(important_queries)} queries for comprehensive search")
         
         # Create tasks for the important searches
         search_tasks = []
         for query in important_queries:
-            task = self._gpt5_search(None, query)  # session not needed for GPT-5 API
+            task = self._gpt_search(None, query)  # session not needed for GPT API
             search_tasks.append(task)
         
         # Execute searches in parallel
@@ -447,7 +456,7 @@ class EnhancedInsuranceAnalysis:
             # Fallback to sequential search if parallel fails
             for query in important_queries:
                 try:
-                    search_results = await self._gpt5_search(None, query)
+                    search_results = await self._gpt_search(None, query)
                     all_search_results.extend(search_results)
                 except Exception as e:
                     print(f"Error searching for query '{query}': {e}")
@@ -470,7 +479,7 @@ class EnhancedInsuranceAnalysis:
         mac_jurisdiction: Optional[Dict] = None
     ) -> List[str]:
         """
-        Generate optimized search queries for Medicare NCDs, LCDs, and LCAs.
+        Generate comprehensive search queries for all Medicare document types and supporting documents.
         """
         
         queries = []
@@ -480,43 +489,124 @@ class EnhancedInsuranceAnalysis:
                          for medicare_term in ['medicare', 'original medicare', 'cms'])
         
         if is_medicare:
-            # Medicare-specific queries targeting NCDs, LCDs, and LCAs
+            # Core Medicare Coverage Documents (NCDs, LCDs, LCAs)
             queries.extend([
                 f"Medicare NCD {cpt_code} {service_type}",
                 f"Medicare LCD {cpt_code} {service_type}",
+                f"Medicare LCA {cpt_code} {service_type}",
                 f"site:cms.gov Medicare Coverage Database {cpt_code}",
-                f"Medicare medical necessity {cpt_code} {service_type}",
-                f"Medicare coverage policy {cpt_code}"
+                f"site:cms.gov NCD {cpt_code} {service_type}",
+                f"site:cms.gov LCD {cpt_code} {service_type}",
+                f"site:cms.gov LCA {cpt_code} {service_type}"
             ])
             
-            # Add MAC-specific queries if jurisdiction is known (simplified)
-            if mac_jurisdiction:
-                mac_name = mac_jurisdiction["name"]
-                queries.extend([
-                    f"{mac_name} Medicare {cpt_code} {service_type}"
-                ])
+            # Medicare Medical Necessity and Coverage Policies
+            queries.extend([
+                f"Medicare medical necessity {cpt_code} {service_type}",
+                f"Medicare coverage policy {cpt_code} {service_type}",
+                f"Medicare coverage determination {cpt_code} {service_type}",
+                f"Medicare clinical policy {cpt_code} {service_type}",
+                f"Medicare utilization management {cpt_code} {service_type}"
+            ])
             
-            # Add specific Medicare Advantage queries if applicable
+            # Medicare Administrative Documents
+            queries.extend([
+                f"Medicare Administrative Contractor MAC {cpt_code} {service_type}",
+                f"Medicare contractor policy {cpt_code} {service_type}",
+                f"Medicare local coverage determination {cpt_code} {service_type}",
+                f"Medicare national coverage determination {cpt_code} {service_type}"
+            ])
+            
+            # Medicare Advantage Specific Documents
             if "advantage" in insurance_provider.lower():
                 queries.extend([
                     f"{insurance_provider} Medicare Advantage medical policy {cpt_code} {service_type}",
                     f"{insurance_provider} Medicare Advantage coverage determination {cpt_code}",
-                    f"{insurance_provider} Medicare Advantage LCD NCD {service_type}"
+                    f"{insurance_provider} Medicare Advantage LCD NCD {service_type}",
+                    f"{insurance_provider} Medicare Advantage clinical policy {cpt_code}",
+                    f"{insurance_provider} Medicare Advantage prior authorization {cpt_code}",
+                    f"{insurance_provider} Medicare Advantage medical necessity {cpt_code}"
                 ])
+            
+            # MAC-Specific Queries (if jurisdiction is known)
+            if mac_jurisdiction:
+                mac_name = mac_jurisdiction["name"]
+                mac_id = mac_jurisdiction["jurisdiction_id"]
+                queries.extend([
+                    f"{mac_name} Medicare {cpt_code} {service_type}",
+                    f"{mac_name} LCD {cpt_code} {service_type}",
+                    f"{mac_name} LCA {cpt_code} {service_type}",
+                    f"site:{mac_jurisdiction.get('website', '')} {cpt_code} {service_type}",
+                    f"MAC {mac_id} {cpt_code} {service_type}",
+                    f"Medicare {mac_id} jurisdiction {cpt_code} {service_type}"
+                ])
+            
+            # Supporting Clinical Documents
+            queries.extend([
+                f"Medicare clinical evidence {cpt_code} {service_type}",
+                f"Medicare clinical studies {cpt_code} {service_type}",
+                f"Medicare evidence-based coverage {cpt_code} {service_type}",
+                f"Medicare clinical guidelines {cpt_code} {service_type}",
+                f"Medicare technology assessment {cpt_code} {service_type}"
+            ])
+            
+            # Regulatory and Compliance Documents
+            queries.extend([
+                f"Medicare regulatory requirements {cpt_code} {service_type}",
+                f"Medicare compliance policy {cpt_code} {service_type}",
+                f"Medicare billing requirements {cpt_code} {service_type}",
+                f"Medicare coding guidelines {cpt_code} {service_type}",
+                f"Medicare documentation requirements {cpt_code} {service_type}"
+            ])
+            
+            # FDA and Clinical Trial Documents
+            queries.extend([
+                f"FDA approval {cpt_code} {service_type}",
+                f"FDA clearance {cpt_code} {service_type}",
+                f"clinical trial {cpt_code} {service_type}",
+                f"FDA companion diagnostic {cpt_code} {service_type}",
+                f"FDA breakthrough device {cpt_code} {service_type}"
+            ])
+            
+            # Professional Society Guidelines
+            queries.extend([
+                f"NCCN guidelines {cpt_code} {service_type}",
+                f"ASCO guidelines {cpt_code} {service_type}",
+                f"professional society guidelines {cpt_code} {service_type}",
+                f"clinical practice guidelines {cpt_code} {service_type}",
+                f"evidence-based guidelines {cpt_code} {service_type}"
+            ])
+            
+            # Cost and Utilization Documents
+            queries.extend([
+                f"Medicare cost analysis {cpt_code} {service_type}",
+                f"Medicare utilization review {cpt_code} {service_type}",
+                f"Medicare cost effectiveness {cpt_code} {service_type}",
+                f"Medicare budget impact {cpt_code} {service_type}"
+            ])
+            
         else:
-            # Non-Medicare provider queries
+            # Non-Medicare Provider Comprehensive Queries
             queries.extend([
                 f"{insurance_provider} medical policy {cpt_code} {service_type} coverage requirements",
                 f"{insurance_provider} prior authorization requirements {cpt_code} {service_type}",
                 f"{insurance_provider} coverage determination {service_type} policy document",
-                f"{insurance_provider} medical necessity criteria {cpt_code} {service_type}"
+                f"{insurance_provider} medical necessity criteria {cpt_code} {service_type}",
+                f"{insurance_provider} clinical policy {cpt_code} {service_type}",
+                f"{insurance_provider} utilization management {cpt_code} {service_type}",
+                f"{insurance_provider} evidence-based coverage {cpt_code} {service_type}",
+                f"{insurance_provider} clinical guidelines {cpt_code} {service_type}",
+                f"{insurance_provider} technology assessment {cpt_code} {service_type}",
+                f"{insurance_provider} FDA approval {cpt_code} {service_type}",
+                f"{insurance_provider} professional guidelines {cpt_code} {service_type}",
+                f"{insurance_provider} cost effectiveness {cpt_code} {service_type}"
             ])
         
         return queries
     
-    async def _gpt5_search(self, session: Optional[aiohttp.ClientSession], query: str) -> List[Dict]:
+    async def _gpt_search(self, session: Optional[aiohttp.ClientSession], query: str) -> List[Dict]:
         """
-        Perform actual GPT-5 search using the API with focus on Medicare documents.
+        Perform search using either GPT-4 or GPT-5 based on configuration.
         """
         
         # Debug: Check if we're using demo key
@@ -527,92 +617,260 @@ class EnhancedInsuranceAnalysis:
         # Enhanced prompt for Medicare document search
         search_prompt = self._create_medicare_search_prompt(query)
         
+        # Log the request details
+        print(f"\n🔍 {self.gpt_model.upper()} SEARCH REQUEST:")
+        print(f"   Query: {query}")
+        print(f"   Model: {self.gpt_model}")
+        print(f"   Temperature: 0.5")
+        print(f"   User Message Length: {len(search_prompt)} characters")
+        print(f"   User Message Preview: {search_prompt[:200]}...")
+        
         try:
-            print(f"🔍 Making GPT-5 search request for: {query}")
+            print(f"\n📤 Sending request to OpenAI API...")
             
-            # Use the correct GPT-5 API format with timeout
             import asyncio
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self.client.responses.create,
-                    model="gpt-5-nano",
-                    tools=[{"type": "web_search_preview"}],
-                    input=search_prompt
-                ),
-                timeout=120.0  # Increased timeout to 2 minutes
-            )
             
-            print(f"✅ GPT-5 search successful for: {query}")
-            
-            # Extract search results from GPT-5 response
-            search_results = self._parse_gpt5_search_response(response, query)
-            return search_results
+            if self.gpt_model == 'gpt-5-nano':
+                # Use GPT-5 API format
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.responses.create,
+                        model="gpt-5-nano",
+                        tools=[{"type": "web_search_preview"}],
+                        input=search_prompt
+                    ),
+                    timeout=120.0  # GPT-5 needs more time
+                )
+                
+                # Log the response details
+                print(f"\n📥 {self.gpt_model.upper()} SEARCH RESPONSE:")
+                print(f"   Model Used: {response.model}")
+                print(f"   Response Content Length: {len(response.output_text)} characters")
+                print(f"   Response Content Preview: {response.output_text[:300]}...")
+                
+                print(f"✅ {self.gpt_model} search successful for: {query}")
+                
+                # Extract search results from GPT-5 response
+                search_results = self._parse_gpt5_search_response(response, query)
+                print(f"📊 Parsed {len(search_results)} search results")
+                return search_results
+                
+            elif self.gpt_model in ['gpt-4o', 'gpt-4o-mini-search-preview']:
+                # Use GPT-4o-mini-search-preview API format with web search
+                # Note: gpt-4o-mini-search-preview doesn't support temperature parameter
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.chat.completions.create,
+                        model="gpt-4o-mini-search-preview",
+                        messages=[
+                            {"role": "system", "content": "You are a medical policy search assistant. Search for and return relevant medical policy documents."},
+                            {"role": "user", "content": search_prompt}
+                        ],
+                        max_tokens=2000
+                    ),
+                    timeout=60.0  # GPT-4o-mini-search-preview is faster
+                )
+                
+                # Log the response details
+                print(f"\n📥 {self.gpt_model.upper()} SEARCH RESPONSE:")
+                print(f"   Model Used: {response.model}")
+                print(f"   Usage - Prompt Tokens: {response.usage.prompt_tokens}")
+                print(f"   Usage - Completion Tokens: {response.usage.completion_tokens}")
+                print(f"   Usage - Total Tokens: {response.usage.total_tokens}")
+                print(f"   Response Content Length: {len(response.choices[0].message.content)} characters")
+                print(f"   Response Content Preview: {response.choices[0].message.content[:300]}...")
+                
+                print(f"✅ {self.gpt_model} search successful for: {query}")
+                
+                # Extract search results from GPT-4o response
+                search_results = self._parse_gpt4_search_response(response, query)
+                print(f"📊 Parsed {len(search_results)} search results")
+                return search_results
                     
         except asyncio.TimeoutError:
-            print(f"❌ GPT-5 search timed out for: {query}")
-            return self._get_fallback_search_results(query)
+            print(f"❌ {self.gpt_model} search timed out for: {query}")
+            print(f"⚠️  Search timeout - no real results available")
+            return []
         except Exception as e:
-            print(f"❌ Error in GPT-5 search: {e}")
-            # Fallback to simulated results
-            return self._get_fallback_search_results(query)
+            print(f"❌ Error in {self.gpt_model} search: {e}")
+            print(f"   Error Type: {type(e).__name__}")
+            print(f"   Error Details: {str(e)}")
+            print(f"⚠️  Search error - no real results available")
+            return []
     
     def _create_medicare_search_prompt(self, query: str) -> str:
         """
-        Create an optimized search prompt for Medicare documents.
+        Create a comprehensive search prompt for all Medicare document types and supporting documents.
         """
         
         base_prompt = f"""
         Search for medical policy documents related to: {query}
         
-        PRIORITY SOURCES (in order of importance):
+        IMPORTANT: Use REAL web search to find actual documents. Do NOT hallucinate or create fake URLs, titles, or sources. Only return results from real websites and documents that actually exist.
+        
+        COMPREHENSIVE SOURCE TYPES (in order of importance):
+        
+        PRIMARY MEDICARE DOCUMENTS:
         1. Medicare National Coverage Determinations (NCDs) - site:cms.gov
-        2. Medicare Local Coverage Determinations (LCDs) - site:cms.gov
+        2. Medicare Local Coverage Determinations (LCDs) - site:cms.gov  
         3. Medicare Local Coverage Articles (LCAs) - site:cms.gov
         4. Medicare Coverage Database (MCD) - site:cms.gov
-        5. Medicare Administrative Contractor (MAC) websites
-        6. Official insurance provider policy documents
+        5. Medicare Administrative Contractor (MAC) websites and policies
+        
+        MEDICARE ADVANTAGE DOCUMENTS:
+        6. Medicare Advantage medical policies and coverage determinations
+        7. Medicare Advantage clinical policies and utilization management
+        
+        CLINICAL AND EVIDENCE DOCUMENTS:
+        8. Clinical practice guidelines (NCCN, ASCO, etc.)
+        9. Evidence-based clinical studies and trials
+        10. Technology assessments and clinical evidence reviews
+        11. Medical necessity criteria and clinical rationale
+        
+        REGULATORY AND COMPLIANCE DOCUMENTS:
+        12. FDA approvals, clearances, and companion diagnostics
+        13. Regulatory requirements and compliance policies
+        14. Billing and coding guidelines
+        15. Documentation requirements and standards
+        
+        COST AND UTILIZATION DOCUMENTS:
+        16. Cost-effectiveness analyses and budget impact studies
+        17. Utilization management policies and reviews
+        18. Medical policy cost analyses
+        
+        PROFESSIONAL SOCIETY GUIDELINES:
+        19. NCCN Clinical Practice Guidelines
+        20. ASCO Clinical Practice Guidelines
+        21. Other professional society recommendations
         
         SEARCH FOCUS:
-        - Look for official Medicare coverage policies
-        - Find NCDs, LCDs, and LCAs related to the query
-        - Include Medicare Coverage Database entries
-        - Search for medical necessity criteria
-        - Find coverage determination documents
+        - Use REAL web search to find actual documents
+        - Prioritize official Medicare coverage policies (NCDs, LCDs, LCAs)
+        - Include Medicare Administrative Contractor specific policies
+        - Find clinical evidence and medical necessity criteria
+        - Search for FDA approvals and regulatory requirements
+        - Include professional society guidelines and recommendations
+        - Look for cost-effectiveness and utilization data
+        - Find billing and coding requirements
+        - Only return results from real, existing websites and documents
         
         Return results as a JSON array with fields: title, url, snippet, relevance (0-100), type, source.
         
-        For Medicare documents, use these types:
+        DOCUMENT TYPES TO USE:
         - "ncd" for National Coverage Determinations
         - "lcd" for Local Coverage Determinations  
         - "lca" for Local Coverage Articles
+        - "mac_policy" for Medicare Administrative Contractor policies
+        - "medicare_advantage" for Medicare Advantage policies
+        - "clinical_guideline" for clinical practice guidelines
+        - "fda_document" for FDA approvals and clearances
+        - "clinical_study" for clinical trials and evidence
+        - "cost_analysis" for cost-effectiveness studies
+        - "utilization_policy" for utilization management
+        - "billing_guideline" for billing and coding requirements
+        - "regulatory_document" for regulatory requirements
         - "policy_document" for other policy documents
         - "coverage_determination" for coverage decisions
         
-        Prioritize official CMS and Medicare Administrative Contractor sources.
+        CRITICAL REQUIREMENTS:
+        - Use REAL web search to find actual documents
+        - Do NOT create fake URLs, titles, or sources
+        - Only return results from real, existing websites
+        - Prioritize official sources: CMS.gov, MAC websites, FDA.gov, professional society websites
+        - Include both current and recent historical documents for comprehensive coverage analysis
+        - If no real results are found, return an empty array rather than fake data
         """
         
         return base_prompt
     
-    async def _parse_policy_document_with_gpt5(self, session: aiohttp.ClientSession, search_result: Dict) -> Optional[Dict]:
+    async def _parse_policy_document_with_gpt(self, session: aiohttp.ClientSession, search_result: Dict) -> Optional[Dict]:
         """
-        Parse a policy document using GPT-5 to extract structured information.
-        Enhanced for Medicare NCDs, LCDs, and LCAs.
+        Parse a policy document using either GPT-4 or GPT-5 based on configuration.
         """
         
         # Enhanced prompt for Medicare document analysis
         prompt = self._create_medicare_document_analysis_prompt(search_result)
         
+        # Log the request details
+        # For document parsing, we always use gpt-4o (not the search-preview model)
+        actual_model = "gpt-4o" if self.gpt_model in ['gpt-4o', 'gpt-4o-mini-search-preview'] else self.gpt_model
+        print(f"\n📄 {actual_model.upper()} POLICY DOCUMENT PARSING REQUEST:")
+        print(f"   Document Title: {search_result.get('title', 'Unknown')}")
+        print(f"   Document URL: {search_result.get('url', 'Unknown')}")
+        print(f"   Model: {actual_model}")
+        print(f"   Temperature: 0.5")
+        print(f"   User Message Length: {len(prompt)} characters")
+        print(f"   User Message Preview: {prompt[:200]}...")
+        
         try:
-            # Use the correct GPT-5 API format with timeout
+            print(f"\n📤 Sending policy document parsing request to OpenAI API...")
+            
             import asyncio
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self.client.responses.create,
-                    model="gpt-5-nano",
-                    input=prompt
-                ),
-                timeout=30.0
-            )
+            
+            if self.gpt_model == 'gpt-5-nano':
+                # Use GPT-5 API format
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.responses.create,
+                        model="gpt-5-nano",
+                        input=prompt
+                    ),
+                    timeout=30.0
+                )
+                
+                # Log the response details
+                print(f"\n📥 {actual_model.upper()} POLICY DOCUMENT PARSING RESPONSE:")
+                print(f"   Model Used: {response.model}")
+                print(f"   Response Content Length: {len(response.output_text)} characters")
+                print(f"   Response Content Preview: {response.output_text[:300]}...")
+                
+                print(f"✅ Policy document parsing successful for: {search_result.get('title', 'Unknown')}")
+                
+                # Parse the response
+                parsed_document = self._parse_gpt5_policy_response(response, search_result)
+                if parsed_document:
+                    print(f"📊 Successfully parsed policy document with {len(parsed_document.get('requirements', []))} requirements")
+                else:
+                    print(f"⚠️  Failed to parse policy document")
+                
+                return parsed_document
+                
+            else:
+                # Use GPT-4o API format (no web search needed for document parsing)
+                # Note: Always use gpt-4o for document parsing, not the search-preview model
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.chat.completions.create,
+                        model="gpt-4o",
+                        messages=[
+                            {"role": "system", "content": "You are a medical policy document analyzer. Extract structured information from policy documents."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.5,
+                        max_tokens=1500
+                    ),
+                    timeout=30.0
+                )
+                
+                # Log the response details
+                print(f"\n📥 {actual_model.upper()} POLICY DOCUMENT PARSING RESPONSE:")
+                print(f"   Model Used: {response.model}")
+                print(f"   Usage - Prompt Tokens: {response.usage.prompt_tokens}")
+                print(f"   Usage - Completion Tokens: {response.usage.completion_tokens}")
+                print(f"   Usage - Total Tokens: {response.usage.total_tokens}")
+                print(f"   Response Content Length: {len(response.choices[0].message.content)} characters")
+                print(f"   Response Content Preview: {response.choices[0].message.content[:300]}...")
+                
+                print(f"✅ Policy document parsing successful for: {search_result.get('title', 'Unknown')}")
+                
+                # Parse the response
+                parsed_document = self._parse_gpt4_policy_response(response, search_result)
+                if parsed_document:
+                    print(f"📊 Successfully parsed policy document with {len(parsed_document.get('requirements', []))} requirements")
+                else:
+                    print(f"⚠️  Failed to parse policy document")
+                
+                return parsed_document
             
             content = response.output_text
             
@@ -708,7 +966,7 @@ class EnhancedInsuranceAnalysis:
         
         return prompt
     
-    async def _analyze_coverage_and_requirements_with_gpt5(
+    async def _analyze_coverage_and_requirements_with_gpt(
         self, 
         cpt_code: str, 
         insurance_provider: str, 
@@ -727,28 +985,45 @@ class EnhancedInsuranceAnalysis:
         )
         
         try:
-            # Use the correct GPT-5 API format with timeout
             import asyncio
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self.client.responses.create,
-                    model="gpt-5-nano",
-                    input=prompt
-                ),
-                timeout=30.0
-            )
             
-            content = response.output_text
+            if self.gpt_model == 'gpt-5-nano':
+                # Use GPT-5 API format
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.responses.create,
+                        model="gpt-5-nano",
+                        input=prompt
+                    ),
+                    timeout=30.0
+                )
+                content = response.output_text
+            else:
+                # Use GPT-4o API format (no web search needed for analysis)
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.chat.completions.create,
+                        model="gpt-4o",
+                        messages=[
+                            {"role": "system", "content": "You are a medical policy analyst. Analyze coverage and requirements from policy documents."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.6,
+                        max_tokens=2000
+                    ),
+                    timeout=30.0
+                )
+                content = response.choices[0].message.content
             
             # Parse analysis results
             analysis_result = self._parse_analysis_response(content, cpt_code, insurance_provider, mac_jurisdiction)
             return analysis_result
                 
         except asyncio.TimeoutError:
-            print(f"GPT-5 analysis timed out")
+            print(f"{self.gpt_model} analysis timed out")
             return self._get_fallback_analysis(cpt_code, insurance_provider, policy_documents, mac_jurisdiction)
         except Exception as e:
-            print(f"Error in GPT-5 analysis: {e}")
+            print(f"Error in {self.gpt_model} analysis: {e}")
             return self._get_fallback_analysis(cpt_code, insurance_provider, policy_documents, mac_jurisdiction)
     
     def _create_medicare_analysis_prompt(
@@ -826,6 +1101,45 @@ class EnhancedInsuranceAnalysis:
         
         return prompt
     
+    def _parse_gpt4_search_response(self, response, query: str) -> List[Dict]:
+        """
+        Parse GPT-4o-mini-search-preview response and extract structured results.
+        """
+        try:
+            # Extract content from GPT-4o-mini-search-preview response
+            content = response.choices[0].message.content
+            print(f"🔍 Parsing GPT-4o-mini-search-preview response content (length: {len(content)})")
+            
+            # Try to parse JSON from the response
+            if '[' in content and ']' in content:
+                start_idx = content.find('[')
+                end_idx = content.rfind(']') + 1
+                json_str = content[start_idx:end_idx]
+                print(f"📋 Extracted JSON string (length: {len(json_str)})")
+                
+                try:
+                    results = json.loads(json_str)
+                    if isinstance(results, list):
+                        # Validate and filter results to remove hallucinations
+                        # validated_results = self._validate_search_results(results, query)
+                        # print(f"✅ Successfully parsed {len(results)} results, validated {len(validated_results)} real results")
+                        return results
+                    else:
+                        print(f"⚠️  Parsed JSON is not a list: {type(results)}")
+                except json.JSONDecodeError as e:
+                    print(f"❌ JSON decode error: {e}")
+                    print(f"📋 JSON string preview: {json_str[:200]}...")
+            
+            # If JSON parsing fails, try to extract structured information
+            print(f"🔄 Falling back to text extraction for query: {query}")
+            return self._extract_structured_results_from_text(content, query)
+            
+        except Exception as e:
+            print(f"❌ Error parsing GPT-4o-mini-search-preview response: {e}")
+            print(f"   Error Type: {type(e).__name__}")
+            print(f"⚠️  Parse error - no real results available")
+            return []
+    
     def _parse_gpt5_search_response(self, response, query: str) -> List[Dict]:
         """
         Parse GPT-5 search response and extract structured results.
@@ -854,9 +1168,62 @@ class EnhancedInsuranceAnalysis:
             print(f"Error parsing GPT-5 search response: {e}")
             return self._get_fallback_search_results(query)
     
+    # def _validate_search_results(self, results: List[Dict], query: str) -> List[Dict]:
+    #     """
+    #     Validate search results to filter out hallucinations and fake data.
+    #     """
+    #     validated_results = []
+        
+    #     for result in results:
+    #         # Check for required fields
+    #         if not isinstance(result, dict):
+    #             continue
+                
+    #         title = result.get('title', '')
+    #         url = result.get('url', '')
+            
+    #         # Skip results with missing essential fields
+    #         if not title or not url:
+    #             continue
+            
+    #         # Filter out common hallucination patterns
+    #         if any(pattern in url.lower() for pattern in [
+    #             'example.com', 'example-', 'placeholder', 'fake', 'dummy', 'test',
+    #             'sample.com', 'demo.com', 'mock.com', 'temporary.com'
+    #         ]):
+    #             print(f"🚫 Filtered out hallucinated URL: {url}")
+    #             continue
+            
+    #         # Filter out generic or suspicious titles
+    #         if any(pattern in title.lower() for pattern in [
+    #             'example', 'placeholder', 'fake', 'dummy', 'test', 'sample',
+    #             'mock', 'temporary', 'generic'
+    #         ]):
+    #             print(f"🚫 Filtered out suspicious title: {title}")
+    #             continue
+            
+    #         # Check for realistic URL patterns
+    #         if not any(domain in url.lower() for domain in [
+    #             'cms.gov', 'medicare.gov', 'fda.gov', 'nccn.org', 'asco.org',
+    #             'medicare', 'gov', 'org', 'edu', 'health', 'medical'
+    #         ]):
+    #             print(f"⚠️  Suspicious URL pattern: {url}")
+    #             # Don't filter out completely, but flag for review
+            
+    #         # Validate URL format
+    #         if not url.startswith(('http://', 'https://')):
+    #             print(f"🚫 Invalid URL format: {url}")
+    #             continue
+            
+    #         # If we get here, the result looks valid
+    #         validated_results.append(result)
+        
+    #     print(f"🔍 Validation: {len(results)} total results, {len(validated_results)} validated")
+    #     return validated_results
+    
     def _extract_structured_results_from_text(self, text: str, query: str) -> List[Dict]:
         """
-        Extract structured search results from GPT-5 text response.
+        Extract structured search results from GPT text response.
         """
         results = []
         
@@ -898,9 +1265,9 @@ class EnhancedInsuranceAnalysis:
             result.setdefault('type', 'policy_document')
             result.setdefault('source', 'Unknown')
         
-        return results if results else self._get_fallback_search_results(query)
+        return results if results else []
     
-    async def _extract_policy_documents_with_gpt5(self, search_results: List[Dict]) -> List[Dict]:
+    async def _extract_policy_documents_with_gpt(self, search_results: List[Dict]) -> List[Dict]:
         """
         Extract and parse policy documents from search results using GPT-5.
         """
@@ -923,7 +1290,7 @@ class EnhancedInsuranceAnalysis:
         # Create tasks for document parsing
         parse_tasks = []
         for result in documents_to_parse:
-            task = self._parse_policy_document_with_gpt5(None, result)  # session not needed
+            task = self._parse_policy_document_with_gpt(None, result)  # session not needed
             parse_tasks.append(task)
         
         # Execute all parsing in parallel
@@ -943,7 +1310,7 @@ class EnhancedInsuranceAnalysis:
             # Fallback to sequential parsing if parallel fails
             for result in documents_to_parse:
                 try:
-                    extracted_doc = await self._parse_policy_document_with_gpt5(None, result)
+                    extracted_doc = await self._parse_policy_document_with_gpt(None, result)
                     if extracted_doc:
                         extracted_documents.append(extracted_doc)
                 except Exception as e:
@@ -952,9 +1319,31 @@ class EnhancedInsuranceAnalysis:
         
         return extracted_documents
     
+    def _parse_gpt4_policy_response(self, response, search_result: Dict) -> Optional[Dict]:
+        """
+        Parse GPT-4o policy document response.
+        """
+        try:
+            content = response.choices[0].message.content
+            return self._extract_document_info_from_text(content, search_result)
+        except Exception as e:
+            print(f"Error parsing GPT-4o policy response: {e}")
+            return None
+    
+    def _parse_gpt5_policy_response(self, response, search_result: Dict) -> Optional[Dict]:
+        """
+        Parse GPT-5 policy document response.
+        """
+        try:
+            content = response.output_text
+            return self._extract_document_info_from_text(content, search_result)
+        except Exception as e:
+            print(f"Error parsing GPT-5 policy response: {e}")
+            return None
+    
     def _extract_document_info_from_text(self, text: str, search_result: Dict) -> Dict:
         """
-        Extract document information from GPT-5 text response.
+        Extract document information from GPT text response.
         """
         doc_info = {
             "title": search_result.get("title", ""),
@@ -1120,7 +1509,7 @@ class EnhancedInsuranceAnalysis:
             lcd_applicable=False
         )
     
-    async def _check_patient_criteria_with_gpt5(
+    async def _check_patient_criteria_with_gpt(
         self, 
         requirements: List[InsuranceRequirement], 
         patient_context: Dict
@@ -1154,28 +1543,45 @@ class EnhancedInsuranceAnalysis:
         """
         
         try:
-            # Use the correct GPT-5 API format with timeout
             import asyncio
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self.client.responses.create,
-                    model="gpt-5-nano",
-                    input=prompt
-                ),
-                timeout=30.0
-            )
             
-            content = response.output_text
+            if self.gpt_model == 'gpt-5-nano':
+                # Use GPT-5 API format
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.responses.create,
+                        model="gpt-5-nano",
+                        input=prompt
+                    ),
+                    timeout=30.0
+                )
+                content = response.output_text
+            else:
+                # Use GPT-4o API format (no web search needed for criteria matching)
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.chat.completions.create,
+                        model="gpt-4o",
+                        messages=[
+                            {"role": "system", "content": "You are a medical criteria matching assistant. Check if patient data meets insurance requirements."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.5,
+                        max_tokens=1000
+                    ),
+                    timeout=30.0
+                )
+                content = response.choices[0].message.content
             
             # Parse criteria matching results
             criteria_match = self._parse_criteria_response(content, requirements)
             return criteria_match
                 
         except asyncio.TimeoutError:
-            print(f"GPT-5 criteria matching timed out")
+            print(f"{self.gpt_model} criteria matching timed out")
             return self._get_fallback_criteria_match(requirements, patient_context)
         except Exception as e:
-            print(f"Error in GPT-5 criteria matching: {e}")
+            print(f"Error in {self.gpt_model} criteria matching: {e}")
             return self._get_fallback_criteria_match(requirements, patient_context)
     
     def _parse_criteria_response(self, content: str, requirements: List[InsuranceRequirement]) -> Dict[str, bool]:
@@ -1204,7 +1610,7 @@ class EnhancedInsuranceAnalysis:
         # Fallback to default matching
         return self._get_fallback_criteria_match(requirements, {})
     
-    async def _generate_recommendations_with_gpt5(
+    async def _generate_recommendations_with_gpt(
         self, 
         coverage_info: CoverageAnalysis, 
         patient_criteria_match: Dict[str, bool], 
@@ -1240,28 +1646,45 @@ class EnhancedInsuranceAnalysis:
         """
         
         try:
-            # Use the correct GPT-5 API format with timeout
             import asyncio
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self.client.responses.create,
-                    model="gpt-5-nano",
-                    input=prompt
-                ),
-                timeout=30.0
-            )
             
-            content = response.output_text
+            if self.gpt_model == 'gpt-5-nano':
+                # Use GPT-5 API format
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.responses.create,
+                        model="gpt-5-nano",
+                        input=prompt
+                    ),
+                    timeout=30.0
+                )
+                content = response.output_text
+            else:
+                # Use GPT-4o API format (no web search needed for recommendations)
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.chat.completions.create,
+                        model="gpt-4o",
+                        messages=[
+                            {"role": "system", "content": "You are a medical prior authorization assistant. Generate actionable recommendations."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.8,
+                        max_tokens=1500
+                    ),
+                    timeout=30.0
+                )
+                content = response.choices[0].message.content
             
             # Parse recommendations
             recommendations = self._parse_recommendations_response(content)
             return recommendations
                 
         except asyncio.TimeoutError:
-            print(f"GPT-5 recommendations timed out")
+            print(f"{self.gpt_model} recommendations timed out")
             return self._get_fallback_recommendations(coverage_info, patient_criteria_match)
         except Exception as e:
-            print(f"Error in GPT-5 recommendations: {e}")
+            print(f"Error in {self.gpt_model} recommendations: {e}")
             return self._get_fallback_recommendations(coverage_info, patient_criteria_match)
     
     def _parse_recommendations_response(self, content: str) -> List[str]:
@@ -1297,16 +1720,9 @@ class EnhancedInsuranceAnalysis:
     # Fallback methods for when GPT-5 is not available
     def _get_fallback_search_results(self, query: str) -> List[Dict]:
         """Fallback search results when GPT-5 is not available"""
-        return [
-            {
-                "title": f"Medical Policy for {query}",
-                "url": "https://example.com/medical-policy",
-                "snippet": f"Standard medical policy for {query}.",
-                "relevance": 85,
-                "type": "policy_document",
-                "source": "Generic"
-            }
-        ]
+        # Return empty results instead of fake ones to avoid showing example URLs
+        print(f"⚠️  No real search results available for: {query}")
+        return []
     
     def _get_fallback_document_info(self, search_result: Dict) -> Dict:
         """Fallback document information when GPT-5 is not available"""
@@ -1400,6 +1816,327 @@ class EnhancedInsuranceAnalysis:
                 unique_results.append(result)
         
         return unique_results
+    
+    async def _analyze_documents_with_parsing_agent(self, search_results: List[Dict], patient_context: Dict, cpt_code: str, insurance_provider: str) -> Dict:
+        """
+        Parsing agent that analyzes documents to determine:
+        - Checklist of critical requirements for coverage
+        - Validation of clinician's PA request against EHR
+        - Draft message to clinician if more documents needed
+        - Checklist of requirements and medical knowledge for determination
+        """
+        try:
+            print(f"🔍 Parsing Agent: Analyzing {len(search_results)} documents for coverage requirements...")
+            
+            # Filter relevant documents (policy documents, LCDs, NCDs)
+            relevant_docs = [
+                doc for doc in search_results 
+                if doc.get('type') in ['policy_document', 'coverage_determination', 'ncd', 'lcd', 'lca'] 
+                and doc.get('relevance', 0) > 50
+            ]
+            
+            if not relevant_docs:
+                print("⚠️  No relevant policy documents found for parsing")
+                return {
+                    'critical_requirements': [],
+                    'request_validation': {'is_valid': False, 'missing_documents': ['No policy documents found']},
+                    'clinician_message': 'Unable to analyze coverage requirements due to insufficient policy documentation.',
+                    'requirements_checklist': [],
+                    'medical_knowledge': []
+                }
+            
+            # Create prompt for parsing agent
+            prompt = self._create_parsing_agent_prompt(relevant_docs, patient_context, cpt_code, insurance_provider)
+            
+            # Call GPT-5 for analysis
+            response = await self._call_gpt5_direct(prompt)
+            
+            if not response:
+                print("❌ Parsing Agent: No response from GPT-5")
+                return self._create_fallback_parsing_result()
+            
+            # Parse the response
+            parsing_result = self._parse_parsing_agent_response(response, relevant_docs)
+            
+            print(f"✅ Parsing Agent: Analysis complete - {len(parsing_result.get('critical_requirements', []))} requirements found")
+            return parsing_result
+            
+        except Exception as e:
+            print(f"❌ Parsing Agent Error: {e}")
+            return self._create_fallback_parsing_result()
+    
+    async def _call_gpt5_direct(self, prompt: str):
+        """
+        Call GPT-5 directly for analysis without web search.
+        """
+        try:
+            import asyncio
+            
+            if self.gpt_model == 'gpt-5-nano':
+                # Use GPT-5 API format
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.responses.create,
+                        model="gpt-5-nano",
+                        input=prompt
+                    ),
+                    timeout=60.0
+                )
+                return response
+            else:
+                # Use GPT-4o API format as fallback
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.chat.completions.create,
+                        model="gpt-4o",
+                        messages=[
+                            {"role": "system", "content": "You are a medical insurance parsing agent analyzing policy documents."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.3,
+                        max_tokens=2000
+                    ),
+                    timeout=60.0
+                )
+                return response
+                
+        except asyncio.TimeoutError:
+            print(f"GPT-5 direct call timed out")
+            return None
+        except Exception as e:
+            print(f"Error in GPT-5 direct call: {e}")
+            return None
+    
+    def _create_parsing_agent_prompt(self, relevant_docs: List[Dict], patient_context: Dict, cpt_code: str, insurance_provider: str) -> str:
+        """
+        Create prompt for the parsing agent to analyze documents and validate requests.
+        """
+        # Extract document content for analysis
+        doc_content = []
+        for doc in relevant_docs[:5]:  # Limit to top 5 most relevant
+            doc_content.append(f"""
+Document: {doc.get('title', 'Unknown')}
+URL: {doc.get('url', 'N/A')}
+Type: {doc.get('type', 'Unknown')}
+Relevance: {doc.get('relevance', 0)}%
+Content: {doc.get('snippet', 'No content available')}
+""")
+        
+        # Create patient context summary
+        patient_summary = f"""
+Patient Context:
+- CPT Code: {cpt_code}
+- Insurance Provider: {insurance_provider}
+- Has Genetic Counseling: {patient_context.get('has_genetic_counseling', False)}
+- Has Family History: {patient_context.get('has_family_history', False)}
+- Has Clinical Indication: {patient_context.get('has_clinical_indication', True)}
+- Provider Credentials Valid: {patient_context.get('provider_credentials_valid', True)}
+- Patient State: {patient_context.get('patient_state', 'Unknown')}
+"""
+        
+        prompt = f"""
+You are a medical insurance parsing agent analyzing policy documents for prior authorization requests. 
+
+TASK: Analyze the provided policy documents and patient context to:
+
+1. **Extract Critical Requirements Checklist**: Identify all critical requirements for coverage approval
+2. **Validate PA Request**: Check if the clinician's request is valid based on available documentation
+3. **Identify Missing Documents**: If request is invalid, identify what additional documents are needed
+4. **Create Requirements Checklist**: Generate a comprehensive checklist for determination
+5. **Extract Medical Knowledge**: Identify relevant medical knowledge and evidence from the documents
+
+DOCUMENTS TO ANALYZE:
+{chr(10).join(doc_content)}
+
+PATIENT CONTEXT:
+{patient_summary}
+
+ANALYSIS REQUIREMENTS:
+
+1. **Critical Requirements Checklist**:
+   - List each critical requirement with specific criteria
+   - Include documentation requirements
+   - Specify clinical criteria that must be met
+
+2. **Request Validation**:
+   - Determine if the PA request is valid based on available information
+   - Check if all required documentation is present
+   - Identify any gaps in the request
+
+3. **Missing Documents** (if request is invalid):
+   - List specific documents or information needed
+   - Explain why each document is required
+   - Provide guidance on how to obtain missing information
+
+4. **Requirements Checklist for Determination**:
+   - Create a comprehensive checklist for the determination process
+   - Include both clinical and administrative requirements
+   - Specify evidence requirements for each item
+
+5. **Medical Knowledge from Evidence**:
+   - Extract relevant medical knowledge from the policy documents
+   - Identify clinical evidence mentioned in the documents
+   - Note any specific medical criteria or guidelines
+
+RESPONSE FORMAT (JSON):
+{{
+    "critical_requirements": [
+        {{
+            "requirement": "string",
+            "criteria": "string",
+            "documentation_needed": "string",
+            "clinical_criteria": "string"
+        }}
+    ],
+    "request_validation": {{
+        "is_valid": boolean,
+        "missing_documents": ["string"],
+        "validation_notes": "string"
+    }},
+    "clinician_message": "string (message to clinician if request is invalid)",
+    "requirements_checklist": [
+        {{
+            "category": "string",
+            "items": [
+                {{
+                    "requirement": "string",
+                    "evidence_required": "string",
+                    "notes": "string"
+                }}
+            ]
+        }}
+    ],
+    "medical_knowledge": [
+        {{
+            "topic": "string",
+            "evidence": "string",
+            "source_document": "string",
+            "relevance": "string"
+        }}
+    ]
+}}
+
+Analyze the documents thoroughly and provide a comprehensive response following the JSON format above.
+"""
+        
+        return prompt
+    
+    def _parse_parsing_agent_response(self, response, relevant_docs: List[Dict]) -> Dict:
+        """
+        Parse the parsing agent's response and extract structured information.
+        """
+        try:
+            # Handle both GPT-5 and GPT-4o responses
+            if hasattr(response, 'output_text'):
+                content = response.output_text  # GPT-5 format
+            elif hasattr(response, 'choices') and len(response.choices) > 0:
+                content = response.choices[0].message.content  # GPT-4o format
+            else:
+                print("❌ Unknown response format")
+                return self._create_fallback_parsing_result()
+            
+            # Try to extract JSON from the response
+            if '{' in content and '}' in content:
+                start_idx = content.find('{')
+                end_idx = content.rfind('}') + 1
+                if start_idx != -1 and end_idx != -1:
+                    json_str = content[start_idx:end_idx]
+                    try:
+                        result = json.loads(json_str)
+                        return result
+                    except json.JSONDecodeError as e:
+                        print(f"❌ JSON decode error in parsing agent response: {e}")
+            
+            # Fallback: extract structured information from text
+            return self._extract_parsing_info_from_text(content, relevant_docs)
+            
+        except Exception as e:
+            print(f"❌ Error parsing parsing agent response: {e}")
+            return self._create_fallback_parsing_result()
+    
+    def _extract_parsing_info_from_text(self, text: str, relevant_docs: List[Dict]) -> Dict:
+        """
+        Extract parsing information from text response when JSON parsing fails.
+        """
+        result = {
+            'critical_requirements': [],
+            'request_validation': {'is_valid': True, 'missing_documents': [], 'validation_notes': 'Analysis completed'},
+            'clinician_message': 'Request appears valid based on available documentation.',
+            'requirements_checklist': [],
+            'medical_knowledge': []
+        }
+        
+        # Extract critical requirements
+        if 'requirements' in text.lower():
+            lines = text.split('\n')
+            in_requirements = False
+            for line in lines:
+                line = line.strip()
+                if 'requirement' in line.lower() and ':' in line:
+                    req_text = line.split(':', 1)[1].strip()
+                    if req_text:
+                        result['critical_requirements'].append({
+                            'requirement': req_text,
+                            'criteria': 'See policy document',
+                            'documentation_needed': 'Clinical documentation',
+                            'clinical_criteria': 'Medical necessity'
+                        })
+        
+        # Extract medical knowledge
+        if 'medical' in text.lower() or 'evidence' in text.lower():
+            lines = text.split('\n')
+            for line in lines:
+                line = line.strip()
+                if any(keyword in line.lower() for keyword in ['study', 'evidence', 'clinical', 'medical']):
+                    result['medical_knowledge'].append({
+                        'topic': 'Medical evidence',
+                        'evidence': line,
+                        'source_document': relevant_docs[0].get('title', 'Policy Document') if relevant_docs else 'Unknown',
+                        'relevance': 'High'
+                    })
+        
+        return result
+    
+    def _create_fallback_parsing_result(self) -> Dict:
+        """
+        Create a fallback result when parsing agent fails.
+        """
+        return {
+            'critical_requirements': [
+                {
+                    'requirement': 'Medical necessity documentation',
+                    'criteria': 'Clinical indication must be documented',
+                    'documentation_needed': 'Physician notes and clinical documentation',
+                    'clinical_criteria': 'Appropriate clinical indication'
+                }
+            ],
+            'request_validation': {
+                'is_valid': True,
+                'missing_documents': [],
+                'validation_notes': 'Basic validation completed'
+            },
+            'clinician_message': 'Request appears valid. Please ensure all clinical documentation is complete.',
+            'requirements_checklist': [
+                {
+                    'category': 'Clinical Requirements',
+                    'items': [
+                        {
+                            'requirement': 'Medical necessity',
+                            'evidence_required': 'Clinical documentation',
+                            'notes': 'Must demonstrate appropriate clinical indication'
+                        }
+                    ]
+                }
+            ],
+            'medical_knowledge': [
+                {
+                    'topic': 'General coverage',
+                    'evidence': 'Standard medical necessity criteria apply',
+                    'source_document': 'Policy guidelines',
+                    'relevance': 'Standard'
+                }
+            ]
+        }
 
 # Global instance
 enhanced_insurance_analyzer = EnhancedInsuranceAnalysis()

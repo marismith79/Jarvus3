@@ -12,90 +12,7 @@
 
 {% block content %}
 <div class="work-queue-container">
-    <!-- Header Section -->
-    <div class="queue-header">
-        <div class="header-left">
-            <h1><i class="fas fa-robot"></i> AI Agent Prior Authorization Dashboard</h1>
-            <p class="subtitle">Automated prior authorization processing with human oversight</p>
-        </div>
-        <div class="header-right">
-            <div class="stats-summary">
-                <div class="stat-item">
-                    <span class="stat-number" id="total-count">0</span>
-                    <span class="stat-label">Total</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number" id="automated-count">0</span>
-                    <span class="stat-label">Automated</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number" id="human-review-count">0</span>
-                    <span class="stat-label">Human Review</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number" id="completed-count">0</span>
-                    <span class="stat-label">Completed</span>
-                </div>
-                </div>
-        </div>
-    </div>
 
-    <!-- Automation Workflow Overview -->
-    <div class="workflow-overview">
-        <h2>Automation Workflow</h2>
-        <div class="workflow-steps">
-            <div class="workflow-step" data-step="1">
-                <div class="step-icon">
-                    <i class="fas fa-search"></i>
-                </div>
-                <div class="step-info">
-                    <h3>Coverage Determination</h3>
-                    <p>Check if CPT code is covered by insurance plan</p>
-                </div>
-                <!-- <div class="step-status" id="step-1-status">Optional</div> -->
-            </div>
-            <div class="workflow-step" data-step="2">
-                <div class="step-icon">
-                    <i class="fas fa-file-medical"></i>
-                </div>
-                <div class="step-info">
-                    <h3>Requirements Extraction</h3>
-                    <p>Extract clinical requirements and required documents</p>
-                </div>
-                <!-- <div class="step-status" id="step-2-status">Active</div> -->
-            </div>
-            <div class="workflow-step" data-step="3">
-                <div class="step-icon">
-                    <i class="fas fa-clipboard-check"></i>
-                </div>
-                <div class="step-info">
-                    <h3>Screening</h3>
-                    <p>Verify EHR data completeness and procedure appropriateness</p>
-                </div>
-                <!-- <div class="step-status" id="step-3-status">Pending</div> -->
-            </div>
-            <div class="workflow-step" data-step="4">
-                <div class="step-icon">
-                    <i class="fas fa-database"></i>
-                </div>
-                <div class="step-info">
-                    <h3>Data Extraction</h3>
-                    <p>Extract relevant data from EHR with citations</p>
-                </div>
-                <!-- <div class="step-status" id="step-4-status">Pending</div> -->
-            </div>
-            <div class="workflow-step" data-step="5">
-                <div class="step-icon">
-                    <i class="fas fa-paper-plane"></i>
-                </div>
-                <div class="step-info">
-                    <h3>Form Submission</h3>
-                    <p>Fill form and submit after human review</p>
-                </div>
-                <!-- <div class="step-status" id="step-5-status">Pending</div> -->
-            </div>
-        </div>
-    </div>
 
     <!-- Tab Navigation -->
     <div class="tab-navigation">
@@ -285,6 +202,14 @@
                     <div class="progress-text" id="automation-progress-text">0% Complete</div>
                 </div>
 
+                <!-- Step History Panel -->
+                <div class="step-history-panel" id="step-history-panel">
+                    <h4>Step History</h4>
+                    <div class="step-history-container" id="step-history-container">
+                        <!-- Completed steps will be added here -->
+                    </div>
+                </div>
+
                 <!-- Current Step Display -->
                 <div class="current-step-display">
                     <div class="step-header">
@@ -292,8 +217,8 @@
                             <i class="fas fa-search"></i>
                         </div>
                         <div class="step-info">
-                            <h3 id="current-step-title">Step 1: Coverage Determination</h3>
-                            <p id="current-step-description">Checking if CPT code is covered by insurance plan...</p>
+                            <h3 id="current-step-title">Step 1: Policy Research & Coverage Analysis</h3>
+                            <p id="current-step-description">Searching web for insurance policy documents and determining coverage...</p>
                         </div>
                         <div class="step-status" id="current-step-status">
                             <i class="fas fa-spinner fa-spin"></i> Running
@@ -304,18 +229,21 @@
                 <!-- GPT-5 Search Animation -->
                 <div class="gpt5-search-animation" id="gpt5-search-animation" style="display: none;">
                     <div class="search-container">
-                        <div class="search-icon">
-                            <i class="fas fa-search"></i>
-                        </div>
-                        <div class="search-text">
-                            <h4>🔍 GPT-5 Web Search in Progress</h4>
-                            <p>Searching for insurance policy documents...</p>
-                            <div class="search-dots">
-                                <span class="dot"></span>
-                                <span class="dot"></span>
-                                <span class="dot"></span>
+                        <div class="search-header">
+                            <div class="search-icon">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            <div class="search-text">
+                                <h4>🔍 GPT Web Search in Progress</h4>
+                                <p>Searching for insurance policy documents...</p>
+                                <div class="search-dots">
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                </div>
                             </div>
                         </div>
+                        
                         <div class="search-details">
                             <div class="search-query" id="current-search-query">Loading...</div>
                             <div class="search-progress">
@@ -323,6 +251,49 @@
                                     <div class="progress-fill" id="search-progress-fill"></div>
                                 </div>
                                 <span class="progress-text" id="search-progress-text">0%</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Real-time search results -->
+                        <div class="live-search-results" id="live-search-results" style="display: none;">
+                            <h5>📋 Live Search Results:</h5>
+                            <div class="results-container" id="results-container">
+                                <!-- Results will be populated here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Final analysis results -->
+                        <div class="final-analysis" id="final-analysis" style="display: none;">
+                            <h5>📊 Final Analysis:</h5>
+                            <div class="analysis-container" id="analysis-container">
+                                <!-- Analysis will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Completion Animation -->
+                <div class="form-completion-animation" id="form-completion-animation" style="display: none;">
+                    <div class="form-container">
+                        <div class="form-icon">
+                            <i class="fas fa-file-medical"></i>
+                        </div>
+                        <div class="form-text">
+                            <h4>📝 Form Completion in Progress</h4>
+                            <p>Filling form with EHR data and policy references...</p>
+                            <div class="form-dots">
+                                <span class="dot"></span>
+                                <span class="dot"></span>
+                                <span class="dot"></span>
+                            </div>
+                        </div>
+                        <div class="form-details">
+                            <div class="form-query" id="current-form-query">Loading...</div>
+                            <div class="form-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="form-progress-fill"></div>
+                                </div>
+                                <span class="progress-text" id="form-progress-text">0%</span>
                             </div>
                         </div>
                     </div>

@@ -336,10 +336,10 @@ class PriorAuthDatabase:
                     family_data.append((
                         len(family_data) + 1,
                         mrn,
-                        relative['relative'],
+                        relative['relationship'],
                         relative['condition'],
-                        relative.get('age_at_onset', 0),
-                        relative.get('status', 'alive')
+                        relative.get('age_at_diagnosis', 0),
+                        'alive'
                     ))
             
             # Insert family history data
@@ -614,6 +614,34 @@ class PriorAuthDatabase:
             conn.commit()
             return True
         return False
+    
+    def update_prior_auth_step(self, auth_id, step_number):
+        """Update the current step for a prior authorization (simplified version)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE prior_auths 
+            SET current_step = ?, last_updated = ?
+            WHERE id = ?
+        ''', (step_number, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), auth_id))
+        
+        conn.commit()
+        return True
+    
+    def update_prior_auth_status(self, auth_id, status):
+        """Update the status of a prior authorization"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE prior_auths 
+            SET status = ?, last_updated = ?
+            WHERE id = ?
+        ''', (status, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), auth_id))
+        
+        conn.commit()
+        return True
     
     def update_step_status(self, auth_id, step_number, status, details):
         """Update the status of a specific step"""

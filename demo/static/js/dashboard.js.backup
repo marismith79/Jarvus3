@@ -121,18 +121,17 @@ async function updateStats() {
         const response = await fetch('/api/stats');
         const stats = await response.json();
         
-        // Update tab counts (only update elements that exist)
-        const allCount = document.getElementById('all-count');
-        const runningTabCount = document.getElementById('running-tab-count');
-        const reviewTabCount = document.getElementById('review-tab-count');
-        const feedbackTabCount = document.getElementById('feedback-tab-count');
-        const completedTabCount = document.getElementById('completed-tab-count');
+        document.getElementById('total-count').textContent = stats.total;
+        document.getElementById('automated-count').textContent = stats.running || 0;
+        document.getElementById('human-review-count').textContent = (stats.review || 0) + (stats.feedback || 0);
+        document.getElementById('completed-count').textContent = stats.completed || 0;
         
-        if (allCount) allCount.textContent = stats.pending || 0;
-        if (runningTabCount) runningTabCount.textContent = stats.running || 0;
-        if (reviewTabCount) reviewTabCount.textContent = stats.review || 0;
-        if (feedbackTabCount) feedbackTabCount.textContent = stats.feedback || 0;
-        if (completedTabCount) completedTabCount.textContent = stats.completed || 0;
+        // Update tab counts
+        document.getElementById('all-count').textContent = stats.pending || 0;
+        document.getElementById('running-tab-count').textContent = stats.running || 0;
+        document.getElementById('review-tab-count').textContent = stats.review || 0;
+        document.getElementById('feedback-tab-count').textContent = stats.feedback || 0;
+        document.getElementById('completed-tab-count').textContent = stats.completed || 0;
     } catch (error) {
         console.error('Error updating stats:', error);
     }
@@ -967,41 +966,41 @@ function showCompleteAnalysis() {
     // Add step to history
     addCompletedStep(1, result);
 }
-//                                 hideGPT5SearchAnimation();
-//                                 await streamText(content, `
-//                                     <div class="error-result">
-//                                         <h4>Step 1: Coverage Determination - Error</h4>
-//                                         <div class="error-card">
-//                                             <i class="fas fa-exclamation-triangle"></i>
-//                                             <p><strong>Error:</strong> ${data.error}</p>
-//                                             <p>Please try again or contact support.</p>
-//                                         </div>
-//                                     </div>
-//                                 `, 'coverage');
-//                                 return;
-//                         }
-//                     } catch (parseError) {
-//                         console.error('Error parsing SSE data:', parseError);
-//                     }
-//                 }
-//             }
-//         }
+                                hideGPT5SearchAnimation();
+                                await streamText(content, `
+                                    <div class="error-result">
+                                        <h4>Step 1: Coverage Determination - Error</h4>
+                                        <div class="error-card">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            <p><strong>Error:</strong> ${data.error}</p>
+                                            <p>Please try again or contact support.</p>
+                                        </div>
+                                    </div>
+                                `, 'coverage');
+                                return;
+                        }
+                    } catch (parseError) {
+                        console.error('Error parsing SSE data:', parseError);
+                    }
+                }
+            }
+        }
         
-//     } catch (error) {
-//         console.error('Error in GPT-5 search stream:', error);
-//         hideGPT5SearchAnimation();
-//         await streamText(content, `
-//             <div class="error-result">
-//                 <h4>Step 1: Coverage Determination - Error</h4>
-//                 <div class="error-card">
-//                     <i class="fas fa-exclamation-triangle"></i>
-//                     <p><strong>Error:</strong> ${error.message}</p>
-//                     <p>Please try again or contact support.</p>
-//                 </div>
-//             </div>
-//         `, 'coverage');
-//     }
-// }
+    } catch (error) {
+        console.error('Error in GPT-5 search stream:', error);
+        hideGPT5SearchAnimation();
+        await streamText(content, `
+            <div class="error-result">
+                <h4>Step 1: Coverage Determination - Error</h4>
+                <div class="error-card">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p>Please try again or contact support.</p>
+                </div>
+            </div>
+        `, 'coverage');
+    }
+}
 
 async function executeFormCompletionWithEHR() {
     const content = document.getElementById('step-content-container');
