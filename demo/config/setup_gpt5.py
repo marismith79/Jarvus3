@@ -139,7 +139,7 @@ def test_enhanced_insurance_analysis():
     print("=" * 40)
     
     try:
-        from enhanced_insurance_analysis import enhanced_insurance_analyzer
+        from demo.insurance_analysis import enhanced_insurance_analyzer
         
         async def run_test():
             # Simple test case

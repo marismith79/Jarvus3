@@ -8,7 +8,7 @@ and insurance requirements extraction using real GPT-5 search mode.
 import asyncio
 import json
 import os
-from enhanced_insurance_analysis import enhanced_insurance_analyzer
+from demo.insurance_analysis import enhanced_insurance_analyzer
 
 async def test_enhanced_insurance_analysis():
     """Test the enhanced insurance analysis functionality"""

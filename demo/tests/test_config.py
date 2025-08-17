@@ -162,7 +162,7 @@ def test_enhanced_insurance_analysis():
     print("\nTesting enhanced insurance analysis with configuration...")
     
     try:
-        from enhanced_insurance_analysis import EnhancedInsuranceAnalysis
+        from demo.insurance_analysis import EnhancedInsuranceAnalysis
         
         # Create an instance
         analyzer = EnhancedInsuranceAnalysis()

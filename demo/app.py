@@ -1,14 +1,14 @@
 
 from flask import Flask, render_template, jsonify, request
-from mock_ehr_system import MockEHRSystem
-from gpt5_integration import GPT5Integration
-from enhanced_insurance_analysis import enhanced_insurance_analyzer
+from backend.mock_ehr_system import MockEHRSystem
+from backend.gpt5_integration import GPT5Integration
+from backend.insurance_analysis import enhanced_insurance_analyzer
 import json
 import sys
 import os
 import asyncio
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from database import db
+from db.database import db
 
 app = Flask(__name__)
 

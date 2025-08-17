@@ -10,7 +10,7 @@ class MockEHRSystem:
     
     def _load_realistic_data(self):
         """Load realistic EHR data from JSON file"""
-        json_file_path = os.path.join(os.path.dirname(__file__), 'mock_ehr_pa_oncology_genomics_with_notes_and_fhir.json')
+        json_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'db', 'mock_ehr_pa_oncology_genomics_with_notes_and_fhir.json')
         
         try:
             with open(json_file_path, 'r') as file:
