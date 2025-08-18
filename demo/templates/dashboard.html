@@ -65,6 +65,10 @@
             <i class="fas fa-calendar"></i>
             WQ History
         </button>
+        <button class="epic-action-btn" onclick="resetAllCases()" title="Reset All Cases">
+            <i class="fas fa-undo"></i>
+            Reset All
+        </button>
     </div>
 
     <!-- EPIC-style Tab Navigation -->
@@ -106,6 +110,9 @@
                 <option value="feedback">Needs Input</option>
                 <option value="completed">Completed</option>
             </select>
+        </div>
+        <div class="epic-status-info">
+            <span class="status-text">Last refreshed: <span id="last-refreshed-time">Never</span></span>
         </div>
     </div>
 
@@ -203,11 +210,76 @@
             <h2 id="modal-title">Prior Authorization Details</h2>
             <span class="close" onclick="closeModal()">&times;</span>
         </div>
-        <div class="modal-body" id="modal-body">
-            <!-- Details will be loaded here -->
+        
+        <!-- Tab Navigation -->
+        <div class="modal-tabs">
+            <button class="modal-tab active" data-tab="details" onclick="switchModalTab('details')">
+                <i class="fas fa-info-circle"></i>
+                Case Details
+            </button>
+            <button class="modal-tab" data-tab="automation" onclick="switchModalTab('automation')">
+                <i class="fas fa-cogs"></i>
+                Automation Progress
+            </button>
         </div>
+        
+        <!-- Tab Content -->
+        <div class="modal-body">
+            <!-- Details Tab -->
+            <div class="tab-content active" id="details-tab">
+                <div id="modal-body">
+                    <!-- Details will be loaded here -->
+                </div>
+            </div>
+            
+            <!-- Automation Tab -->
+            <div class="tab-content" id="automation-tab">
+                <div class="automation-container">
+                    <!-- Progress Bar -->
+                    <div class="automation-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="automation-progress-fill"></div>
+                        </div>
+                        <div class="progress-text" id="automation-progress-text">0% Complete</div>
+                    </div>
+
+                    <!-- Step History Panel -->
+                    <div class="step-history-panel" id="step-history-panel">
+                        <h4>Step History</h4>
+                        <div class="step-history-container" id="step-history-container">
+                            <!-- Completed steps will be added here -->
+                        </div>
+                    </div>
+
+                    <!-- Current Step Display -->
+                    <div class="current-step-display">
+                        <div class="step-header">
+                            <div class="step-icon" id="current-step-icon">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            <div class="step-info">
+                                <h3 id="current-step-title">Step 1: Policy Research & Coverage Analysis</h3>
+                                <p id="current-step-description">Searching web for insurance policy documents and determining coverage...</p>
+                            </div>
+                            <div class="step-status" id="current-step-status">
+                                <i class="fas fa-spinner fa-spin"></i> Running
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step Content Area -->
+                    <div class="step-content-area">
+                        <div class="content-container" id="step-content-container">
+                            <!-- Content will be dynamically populated -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+            <button class="btn btn-danger" id="modal-cancel-btn" style="display: none;" onclick="cancelAutomation()">Cancel Automation</button>
             <button class="btn btn-primary" id="modal-action-btn">Action</button>
         </div>
     </div>
@@ -230,161 +302,38 @@
     </div>
 </div>
 
-<!-- Automation Workflow Popup -->
-<div class="modal" id="automation-popup">
-    <div class="modal-content automation-modal">
-        <div class="modal-header">
-            <h2><i class="fas fa-robot"></i> AI Agent Automation in Progress</h2>
-            <span class="close" onclick="closeAutomationPopup()">&times;</span>
-        </div>
-        <div class="modal-body">
-            <div class="automation-container">
-                <!-- Progress Bar -->
-                <div class="automation-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="automation-progress-fill"></div>
-                    </div>
-                    <div class="progress-text" id="automation-progress-text">0% Complete</div>
-                </div>
 
-                <!-- Step History Panel -->
-                <div class="step-history-panel" id="step-history-panel">
-                    <h4>Step History</h4>
-                    <div class="step-history-container" id="step-history-container">
-                        <!-- Completed steps will be added here -->
-                    </div>
-                </div>
-
-                <!-- Current Step Display -->
-                <div class="current-step-display">
-                    <div class="step-header">
-                        <div class="step-icon" id="current-step-icon">
-                            <i class="fas fa-search"></i>
-                        </div>
-                        <div class="step-info">
-                            <h3 id="current-step-title">Step 1: Policy Research & Coverage Analysis</h3>
-                            <p id="current-step-description">Searching web for insurance policy documents and determining coverage...</p>
-                        </div>
-                        <div class="step-status" id="current-step-status">
-                            <i class="fas fa-spinner fa-spin"></i> Running
-                        </div>
-                    </div>
-                </div>
-
-                <!-- GPT-5 Search Animation -->
-                <div class="gpt5-search-animation" id="gpt5-search-animation" style="display: none;">
-                    <div class="search-container">
-                        <div class="search-header">
-                            <div class="search-icon">
-                                <i class="fas fa-search"></i>
-                            </div>
-                            <div class="search-text">
-                                <h4>🔍 GPT Web Search in Progress</h4>
-                                <p>Searching for insurance policy documents...</p>
-                                <div class="search-dots">
-                                    <span class="dot"></span>
-                                    <span class="dot"></span>
-                                    <span class="dot"></span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="search-details">
-                            <div class="search-query" id="current-search-query">Loading...</div>
-                            <div class="search-progress">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" id="search-progress-fill"></div>
-                                </div>
-                                <span class="progress-text" id="search-progress-text">0%</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Real-time search results -->
-                        <div class="live-search-results" id="live-search-results" style="display: none;">
-                            <h5>📋 Live Search Results:</h5>
-                            <div class="results-container" id="results-container">
-                                <!-- Results will be populated here -->
-                            </div>
-                        </div>
-                        
-                        <!-- Final analysis results -->
-                        <div class="final-analysis" id="final-analysis" style="display: none;">
-                            <h5>📊 Final Analysis:</h5>
-                            <div class="analysis-container" id="analysis-container">
-                                <!-- Analysis will be populated here -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Form Completion Animation -->
-                <div class="form-completion-animation" id="form-completion-animation" style="display: none;">
-                    <div class="form-container">
-                        <div class="form-icon">
-                            <i class="fas fa-file-medical"></i>
-                        </div>
-                        <div class="form-text">
-                            <h4>📝 Form Completion in Progress</h4>
-                            <p>Filling form with EHR data and policy references...</p>
-                            <div class="form-dots">
-                                <span class="dot"></span>
-                                <span class="dot"></span>
-                                <span class="dot"></span>
-                            </div>
-                        </div>
-                        <div class="form-details">
-                            <div class="form-query" id="current-form-query">Loading...</div>
-                            <div class="form-progress">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" id="form-progress-fill"></div>
-                                </div>
-                                <span class="progress-text" id="form-progress-text">0%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Step Content Area -->
-                <div class="step-content-area">
-                    <div class="content-container" id="step-content-container">
-                        <!-- Content will be dynamically populated -->
-                    </div>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="automation-actions" id="automation-actions" style="display: none;">
-                    <button class="btn btn-success" onclick="approveCurrentStep()">
-                        <i class="fas fa-check"></i> Approve & Continue
-                    </button>
-                    <button class="btn btn-warning" onclick="requestChanges()">
-                        <i class="fas fa-edit"></i> Request Changes
-                    </button>
-                    <button class="btn btn-info" onclick="sendToClinician()">
-                        <i class="fas fa-user-md"></i> Send to Clinician
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Clinician Message Modal -->
 <div class="modal" id="clinician-message-modal">
-    <div class="modal-content">
+    <div class="modal-content large-modal">
         <div class="modal-header">
             <h2>Message to Clinician</h2>
             <span class="close" onclick="closeClinicianModal()">&times;</span>
         </div>
         <div class="modal-body">
-            <div class="message-preview">
-                <h4>Subject: Prior Authorization - Missing Information</h4>
-                <div class="message-content" id="clinician-message-content">
-                    <!-- Message content will be populated -->
+            <div class="message-editor">
+                <div class="form-group">
+                    <label for="clinician-message-subject">Subject:</label>
+                    <input type="text" id="clinician-message-subject" class="form-control" value="Prior Authorization - Missing Information" placeholder="Enter subject...">
+                </div>
+                <div class="form-group">
+                    <label for="clinician-message-body">Message:</label>
+                    <textarea id="clinician-message-body" class="form-control" rows="12" placeholder="Enter your message to the clinician..."></textarea>
+                </div>
+                <div class="message-preview">
+                    <h5>Preview:</h5>
+                    <div class="preview-content" id="clinician-message-preview">
+                        <!-- Preview will be updated as user types -->
+                    </div>
                 </div>
             </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeClinicianModal()">Cancel</button>
+            <button class="btn btn-info" onclick="previewClinicianMessage()">
+                <i class="fas fa-eye"></i> Update Preview
+            </button>
             <button class="btn btn-primary" onclick="sendClinicianMessage()">
                 <i class="fas fa-paper-plane"></i> Send via EPIC
             </button>

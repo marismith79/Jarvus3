@@ -11,21 +11,21 @@
       "gender_identity": "Male",
       "race": "White",
       "preferred_language": "Japanese",
-      "address": "4053 Hickory Rd, Vernon, CT",
+      "address": "189 Elm St, New York, NY",
       "contact": {
         "phone": "555-0179",
         "email": "mia.johnson@example.com"
       },
       "identifiers": {
-        "payer_member_id": "5089393113",
-        "group_id": "48964"
+        "payer_member_id": "1127978094",
+        "group_id": "38657"
       }
     },
     "coverage": {
-      "payer": "Aetna",
+      "payer": "Medicare",
       "plan_type": "Medicare Advantage HMO",
-      "member_id": "5089393113",
-      "group_id": "48964",
+      "member_id": "1127978094",
+      "group_id": "38657",
       "effective_start": "2023-08-27",
       "effective_end": null
     },
@@ -180,36 +180,7 @@
         "date": "2025-07-03"
       }
     ],
-    "family_history": [
-      {
-        "relationship": "Mother",
-        "condition": "Lung cancer",
-        "age_at_diagnosis": 58,
-        "status": "Deceased",
-        "year_of_death": 2018
-      },
-      {
-        "relationship": "Father", 
-        "condition": "Prostate cancer",
-        "age_at_diagnosis": 65,
-        "status": "Alive",
-        "treatment": "Radical prostatectomy"
-      },
-      {
-        "relationship": "Maternal aunt",
-        "condition": "Breast cancer",
-        "age_at_diagnosis": 52,
-        "status": "Alive",
-        "treatment": "Lumpectomy + chemotherapy"
-      },
-      {
-        "relationship": "Paternal uncle",
-        "condition": "Colon cancer",
-        "age_at_diagnosis": 60,
-        "status": "Deceased",
-        "year_of_death": 2015
-      }
-    ],
+    "family_history": [],
     "genetics_counseling_and_consent": {
       "consent_id": "0687b566-e14f-4f73-be33-e44eff9ff0a3",
       "type": "Genetic testing consent",
@@ -221,18 +192,7 @@
         "secondary findings",
         "re-contact policy"
       ],
-      "signed_by": "Mia Johnson",
-      "genetic_counselor": "Dr. Sarah Chen, MS, CGC",
-      "counseling_date": "2024-05-07",
-      "counseling_duration_minutes": 60,
-      "risk_assessment_completed": true,
-      "clinical_utility_discussed": true,
-      "analytical_validity_discussed": true,
-      "clinical_validity_discussed": true,
-      "insurance_coverage_discussed": true,
-      "alternative_testing_options_discussed": true,
-      "limitations_discussed": true,
-      "follow_up_plan_established": true
+      "signed_by": "Mia Johnson"
     },
     "pa_metadata": {
       "pa_id": "PA7350753",
@@ -283,14 +243,14 @@
         "type": "Progress Note (SOAP)",
         "author": "Dr. Jordan Rivera",
         "date": "2025-01-18",
-        "text": "S: Mia Johnson seen in clinic for follow-up of Metastatic non-small cell lung cancer, adenocarcinoma, stage IV. Reports fatigue level 3/10, mild dyspnea on exertion. No fever, chest pain, or bleeding. \nO: ECOG 1. Vitals stable. Lungs clear. No focal neurologic deficits. Labs reviewed: Cr 1.2 mg/dL; Hgb 10.9 g/dL.\nA: Metastatic non-small cell lung cancer, adenocarcinoma, on active treatment. \n\nCOMPREHENSIVE GENOMIC PROFILING INDICATED:\n- Stage IV disease with metastatic spread\n- Adenocarcinoma histology\n- No prior comprehensive NGS testing\n- Strong family history of multiple cancers\n- Genetic counseling completed with Dr. Sarah Chen, MS, CGC\n- Informed consent obtained\n- Results will guide targeted therapy selection\n\nTEST ORDERED: Comprehensive Solid Tumor Panel (500 genes) (CPT 81455)\nPRIOR TESTS: 1 (limited hotspot panel only)\n\nMEDICAL NECESSITY DOCUMENTATION COMPLETE:\n✓ Genetic counseling documentation\n✓ Family history assessment\n✓ Clinical indication documented\n✓ Analytical and clinical validity discussed\n✓ Insurance coverage requirements met\n✓ Informed consent obtained\n\nP: Proceed with comprehensive genomic profiling. Prior authorization submitted with complete supporting documentation. Results will guide targeted therapy selection per NCCN guidelines."
+        "text": "S: Mia Johnson seen in clinic for follow-up of Metastatic non\u2013small cell lung cancer, adenocarcinoma, stage IV. Reports fatigue level 3/10, mild dyspnea on exertion. No fever, chest pain, or bleeding. \nO: ECOG 1. Vitals stable. Lungs clear. No focal neurologic deficits. Labs reviewed: Cr 1.2 mg/dL; Hgb 10.9 g/dL.\nA: Metastatic non\u2013small cell lung cancer, adenocarcinoma, on active treatment. Molecular profiling ordered: Comprehensive Solid Tumor Panel (500 genes) (CPT 81455). Noted prior tests count: 1.\nP: Proceed with molecular test. If actionable alterations present, will consider targeted therapy per guidelines. Will submit prior authorization today with supporting documents."
       },
       {
         "note_id": "7dd678ae-f02e-4717-8479-bc7229d7ecd5",
         "type": "Oncology Consult",
         "author": "Dr. Jordan Rivera",
         "date": "2022-08-16",
-        "text": "REASON FOR CONSULT: Metastatic non-small cell lung cancer, adenocarcinoma\n\nCLINICAL SUMMARY: Mia Johnson presents with metastatic non-small cell lung cancer, adenocarcinoma, AJCC stage IV (T2aN1M1a). Performance status ECOG 1. Patient has strong family history of multiple cancers including lung, prostate, breast, and colon cancer.\n\nMEDICAL NECESSITY FOR COMPREHENSIVE GENOMIC PROFILING:\n- Patient has advanced/metastatic cancer (Stage IV)\n- No prior comprehensive NGS testing on this tumor\n- Strong family history suggests potential hereditary component\n- Results will guide targeted therapy selection\n- TMB/MSI status needed for immunotherapy consideration\n- Patient meets NCCN guidelines for comprehensive genomic profiling\n\nCLINICAL INDICATION:\n- Stage IV non-small cell lung cancer\n- Adenocarcinoma histology\n- Metastatic disease present\n- Performance status suitable for treatment\n- No prior comprehensive genomic profiling\n- Family history of multiple cancers\n\nASSESSMENT/PLAN:\n1. Comprehensive tumor profiling (CPT 81455) - Comprehensive Solid Tumor Panel (500 genes)\n2. Genetic counseling completed with Dr. Sarah Chen, MS, CGC\n3. Informed consent obtained\n4. Results will guide targeted therapy selection\n5. Consider germline testing if suspicious variants identified\n\nMEDICAL NECESSITY JUSTIFICATION:\n- Results will directly impact treatment decisions\n- Patient eligible for targeted therapies based on molecular profile\n- TMB/MSI status critical for immunotherapy consideration\n- Family history warrants comprehensive assessment\n- Meets all insurance coverage criteria for advanced cancer\n\nPathology confirms histology consistent with diagnosis. All documentation requirements met for prior authorization."
+        "text": "Reason for consult: Metastatic non\u2013small cell lung cancer, adenocarcinoma. Summary: Mia Johnson presents with Metastatic non\u2013small cell lung cancer, adenocarcinoma. AJCC stage IV. Performance status ECOG 1. Family history reviewed; genetic counseling offered.\nAssessment/Plan: Comprehensive tumor profiling to assess for targetable alterations and to estimate TMB/MSI. Consent obtained for genetic testing. Pathology confirms histology consistent with diagnosis."
       },
       {
         "note_id": "52443570-bbc2-464b-8c46-64391ef7e647",
@@ -309,9 +269,9 @@
       {
         "note_id": "dc9c2a3c-e81f-49f5-a97f-71b46dfac8c8",
         "type": "Genetic Counseling Note",
-        "author": "Dr. Sarah Chen, MS, CGC",
+        "author": "Genetic Counselor, MS, CGC",
         "date": "2024-05-07",
-        "text": "COMPREHENSIVE GENETIC COUNSELING SESSION - COMPLETED\n\nPATIENT: Mia Johnson (MRN: MRN542417)\nDIAGNOSIS: Metastatic non-small cell lung cancer, adenocarcinoma, Stage IV\nTEST REQUESTED: Comprehensive Solid Tumor Panel (500 genes) - CPT 81455\n\nFAMILY HISTORY ASSESSMENT:\n- Mother: Lung cancer diagnosed at age 58, deceased 2018\n- Father: Prostate cancer diagnosed at age 65, alive, treated with radical prostatectomy\n- Maternal aunt: Breast cancer diagnosed at age 52, alive, treated with lumpectomy + chemotherapy\n- Paternal uncle: Colon cancer diagnosed at age 60, deceased 2015\n\nRISK ASSESSMENT:\n- Strong family history of multiple cancer types suggests potential hereditary cancer syndrome\n- Patient's early-onset lung cancer (age 57) with family history warrants comprehensive genomic profiling\n- Clinical utility: Results may guide targeted therapy selection and identify germline risk factors\n\nCOUNSELING COMPONENTS COMPLETED:\n✓ Purpose and scope of testing explained\n✓ Genes/panel scope discussed (500 genes including actionable targets)\n✓ Privacy and data use policies reviewed\n✓ Secondary findings policy explained\n✓ Re-contact policy discussed\n✓ Clinical utility of results explained\n✓ Analytical validity discussed (99.9% sensitivity, 99.5% specificity)\n✓ Clinical validity discussed (FDA-approved companion diagnostics)\n✓ Insurance coverage and prior authorization process explained\n✓ Alternative testing options discussed\n✓ Limitations of testing explained\n✓ Follow-up plan established\n\nINFORMED CONSENT:\n- Patient demonstrates understanding of test purpose and limitations\n- Consent signed and witnessed\n- Copy provided to patient\n\nCLINICAL RECOMMENDATION:\n- Proceed with comprehensive genomic profiling\n- Results will be disclosed by ordering physician\n- Genetic counselor available for follow-up questions\n- Consider germline testing if suspicious variants identified\n\nDOCUMENTATION: Complete family history documented, risk assessment completed, informed consent obtained. All requirements for insurance coverage met."
+        "text": "Pre-test counseling conducted. Discussed benefits/limitations of tumor profiling and potential incidental/secondary findings. Consent elements reviewed: purpose/scope, genes/panel scope, privacy/data use, secondary findings, re-contact policy. Patient signed consent; copy filed.\nFamily history notable for: non-contributory.\nPlan: Disclose results with oncology; discuss implications for relatives if germline risk suspected."
       },
       {
         "note_id": "c1210055-0e56-45dd-87fd-1cdba307b48f",
@@ -341,21 +301,21 @@
       "gender_identity": "Female",
       "race": "Black or African American",
       "preferred_language": "Spanish",
-      "address": "7415 Ash Ave, Hartford, CT",
+      "address": "314 Elm St, New York, NY",
       "contact": {
         "phone": "555-0155",
         "email": "mia.anderson@example.com"
       },
       "identifiers": {
-        "payer_member_id": "1440801160",
-        "group_id": "37552"
+        "payer_member_id": "4131575764",
+        "group_id": "31417"
       }
     },
     "coverage": {
-      "payer": "UnitedHealthcare",
-      "plan_type": "Medicare Advantage PPO",
-      "member_id": "1440801160",
-      "group_id": "37552",
+      "payer": "Medicare",
+      "plan_type": "Medicare Advantage HMO",
+      "member_id": "4131575764",
+      "group_id": "31417",
       "effective_start": "2024-04-18",
       "effective_end": null
     },
@@ -625,21 +585,21 @@
       "gender_identity": "Female",
       "race": "Other",
       "preferred_language": "Spanish",
-      "address": "3295 Ash Ave, Middletown, CT",
+      "address": "981 Elm St, Ann Arbor, MI",
       "contact": {
         "phone": "555-0180",
         "email": "evelyn.hall@example.com"
       },
       "identifiers": {
-        "payer_member_id": "3321691176",
-        "group_id": "18484"
+        "payer_member_id": "8047877267",
+        "group_id": "24621"
       }
     },
     "coverage": {
-      "payer": "Cigna",
-      "plan_type": "Commercial HMO",
-      "member_id": "3321691176",
-      "group_id": "18484",
+      "payer": "Medicare",
+      "plan_type": "Medicare Advantage HMO",
+      "member_id": "8047877267",
+      "group_id": "24621",
       "effective_start": "2023-10-28",
       "effective_end": null
     },
@@ -920,21 +880,21 @@
       "gender_identity": "Male",
       "race": "Asian",
       "preferred_language": "Spanish",
-      "address": "7571 Chestnut St, Bristol, CT",
+      "address": "765 Elm St, New Haven, CT",
       "contact": {
         "phone": "555-0195",
         "email": "james.thomas@example.com"
       },
       "identifiers": {
-        "payer_member_id": "3806077634",
-        "group_id": "38845"
+        "payer_member_id": "2939118223",
+        "group_id": "42493"
       }
     },
     "coverage": {
-      "payer": "Husky Health CT",
-      "plan_type": "HUSKY B",
-      "member_id": "3806077634",
-      "group_id": "38845",
+      "payer": "UnitedHealthcare",
+      "plan_type": "Commercial PPO",
+      "member_id": "2939118223",
+      "group_id": "42493",
       "effective_start": "2023-08-19",
       "effective_end": null
     },
@@ -1205,21 +1165,21 @@
       "gender_identity": "Female",
       "race": "Hispanic/Latino",
       "preferred_language": "English",
-      "address": "722 Hickory Rd, West Haven, CT",
+      "address": "553 Elm St, New York, NY",
       "contact": {
         "phone": "555-0119",
         "email": "levi.hernandez@example.com"
       },
       "identifiers": {
-        "payer_member_id": "5807996872",
-        "group_id": "15351"
+        "payer_member_id": "2015242176",
+        "group_id": "63269"
       }
     },
     "coverage": {
-      "payer": "Cigna",
-      "plan_type": "Commercial PPO",
-      "member_id": "5807996872",
-      "group_id": "15351",
+      "payer": "Medicare",
+      "plan_type": "Medicare Advantage HMO",
+      "member_id": "2015242176",
+      "group_id": "63269",
       "effective_start": "2024-05-12",
       "effective_end": null
     },
@@ -1498,21 +1458,21 @@
       "gender_identity": "Male",
       "race": "Asian",
       "preferred_language": "English",
-      "address": "6694 Spruce Dr, New Haven, CT",
+      "address": "505 Elm St, Ann Arbor, MI",
       "contact": {
         "phone": "555-0143",
         "email": "evelyn.walker@example.com"
       },
       "identifiers": {
-        "payer_member_id": "5949553211",
-        "group_id": "75379"
+        "payer_member_id": "7258731893",
+        "group_id": "19508"
       }
     },
     "coverage": {
-      "payer": "Humana",
-      "plan_type": "Medicare Advantage PPO",
-      "member_id": "5949553211",
-      "group_id": "75379",
+      "payer": "BlueShield CT",
+      "plan_type": "PPO",
+      "member_id": "7258731893",
+      "group_id": "19508",
       "effective_start": "2023-01-10",
       "effective_end": null
     },
@@ -1768,21 +1728,21 @@
       "gender_identity": "Female",
       "race": "Asian",
       "preferred_language": "English",
-      "address": "7355 Sycamore Ln, Bridgeport, CT",
+      "address": "441 Elm St, Ann Arbor, MI",
       "contact": {
         "phone": "555-0110",
         "email": "camila.clark@example.com"
       },
       "identifiers": {
-        "payer_member_id": "3190644685",
-        "group_id": "75294"
+        "payer_member_id": "8325785916",
+        "group_id": "83519"
       }
     },
     "coverage": {
-      "payer": "Kaiser Permanente",
-      "plan_type": "Medicare Advantage HMO",
-      "member_id": "3190644685",
-      "group_id": "75294",
+      "payer": "BlueShield CT",
+      "plan_type": "PPO",
+      "member_id": "8325785916",
+      "group_id": "83519",
       "effective_start": "2023-01-10",
       "effective_end": null
     },
@@ -2049,21 +2009,21 @@
       "gender_identity": "Male",
       "race": "Black or African American",
       "preferred_language": "English",
-      "address": "4846 Hemlock Ln, Wallingford, CT",
+      "address": "297 Elm St, New Haven, CT",
       "contact": {
         "phone": "555-0194",
         "email": "isabella.smith@example.com"
       },
       "identifiers": {
-        "payer_member_id": "1337838528",
-        "group_id": "59691"
+        "payer_member_id": "4712367625",
+        "group_id": "46585"
       }
     },
     "coverage": {
-      "payer": "Husky Health CT",
-      "plan_type": "HUSKY C",
-      "member_id": "1337838528",
-      "group_id": "59691",
+      "payer": "BlueShield CT",
+      "plan_type": "PPO",
+      "member_id": "4712367625",
+      "group_id": "46585",
       "effective_start": "2023-12-26",
       "effective_end": null
     },
@@ -2313,21 +2273,21 @@
       "gender_identity": "Female",
       "race": "Black or African American",
       "preferred_language": "Japanese",
-      "address": "7149 Cypress Way, New London, CT",
+      "address": "408 Elm St, New Haven, CT",
       "contact": {
         "phone": "555-0182",
         "email": "olivia.young@example.com"
       },
       "identifiers": {
-        "payer_member_id": "6795397927",
-        "group_id": "89573"
+        "payer_member_id": "6600100279",
+        "group_id": "37549"
       }
     },
     "coverage": {
-      "payer": "Kaiser Permanente",
-      "plan_type": "Commercial HMO",
-      "member_id": "6795397927",
-      "group_id": "89573",
+      "payer": "Medicare",
+      "plan_type": "Medicare Advantage HMO",
+      "member_id": "6600100279",
+      "group_id": "37549",
       "effective_start": "2024-03-16",
       "effective_end": null
     },
@@ -2589,21 +2549,21 @@
       "gender_identity": "Male",
       "race": "White",
       "preferred_language": "Spanish",
-      "address": "4165 Oak Ave, Danbury, CT",
+      "address": "920 Elm St, New Haven, CT",
       "contact": {
         "phone": "555-0127",
         "email": "sophia.lewis@example.com"
       },
       "identifiers": {
-        "payer_member_id": "6515421029",
-        "group_id": "33232"
+        "payer_member_id": "7852415525",
+        "group_id": "68008"
       }
     },
     "coverage": {
       "payer": "UnitedHealthcare",
       "plan_type": "Commercial PPO",
-      "member_id": "6515421029",
-      "group_id": "33232",
+      "member_id": "7852415525",
+      "group_id": "68008",
       "effective_start": "2024-09-19",
       "effective_end": null
     },

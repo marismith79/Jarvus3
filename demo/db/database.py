@@ -579,19 +579,7 @@ class PriorAuthDatabase:
         conn.commit()
         return True
     
-    def pause_automation(self, auth_id):
-        """Pause automation for a prior authorization"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            UPDATE prior_auths 
-            SET automation_status = 'paused', last_updated = ?
-            WHERE id = ?
-        ''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), auth_id))
-        
-        conn.commit()
-        return True
+
     
     def update_step(self, auth_id, step_number, step_details):
         """Update the current step for a prior authorization"""
@@ -735,6 +723,23 @@ class PriorAuthDatabase:
         
         # Reinitialize with fresh data
         self._init_db()
+        return True
+    
+    def reset_all_to_pending(self):
+        """Reset all prior authorizations to pending status"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE prior_auths 
+            SET status = 'pending', 
+                current_step = 1, 
+                step_details = '{}', 
+                automation_status = 'pending',
+                last_updated = ?
+        ''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'),))
+        
+        conn.commit()
         return True
 
 # Global database instance

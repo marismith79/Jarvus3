@@ -2,11 +2,16 @@
 from flask import Flask, render_template, jsonify, request
 from backend.mock_ehr_system import MockEHRSystem
 from backend.gpt5_integration import GPT5Integration
-from backend.insurance_analysis import enhanced_insurance_analyzer
+from backend.insurance_analysis import enhanced_insurance_analyzer, run_automation_workflow
+from backend.form_manager import FormManager
+from backend.interactive_form_editor import InteractiveFormEditor
 import json
 import sys
 import os
 import asyncio
+import threading
+import time
+from datetime import datetime
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from db.database import db
 
@@ -15,6 +20,8 @@ app = Flask(__name__)
 # Initialize systems
 ehr_system = MockEHRSystem()
 gpt5_system = GPT5Integration()
+form_manager = FormManager(ehr_system)
+form_editor = InteractiveFormEditor(form_manager, ehr_system)
 
 # In-memory demo store for workflows
 # In a real app, replace with a database
@@ -36,6 +43,12 @@ workflows = [
 ]
 next_workflow_id = 3
 
+# Background automation tasks storage
+background_tasks = {}
+
+# Store detailed results for each automation
+automation_details = {}
+
 @app.route('/')
 def dashboard():
     """Main dashboard page"""
@@ -52,6 +65,11 @@ def dashboard():
 def agent_setup():
     """Agent setup page"""
     return render_template('agent_setup.html')
+
+@app.route('/interactive-form')
+def interactive_form():
+    """Interactive form editor page"""
+    return render_template('interactive_form.html')
 
 @app.route('/api/prior-auths/<status>')
 def get_prior_auths(status):
@@ -97,23 +115,645 @@ def get_stats():
 
 @app.route('/api/prior-auths/<int:auth_id>/start-automation', methods=['POST'])
 def start_automation(auth_id):
-    """Start automation for a prior authorization"""
+    """Start automation for a prior authorization in background"""
     try:
-        success = db.start_automation(auth_id)
-        return jsonify({'success': success})
+        # Check if automation is already running
+        if auth_id in background_tasks and background_tasks[auth_id]['is_running']:
+            return jsonify({'success': True, 'message': 'Automation already running'})
+        
+        # Initialize task state
+        background_tasks[auth_id] = {
+            'is_running': True,
+            'current_step': 1,
+            'progress': 0,
+            'message': 'Starting automation...',
+            'start_time': datetime.now(),
+            'last_update': datetime.now(),
+            'results': {},
+            'error': None
+        }
+        
+        # Initialize detailed results storage
+        automation_details[auth_id] = {
+            'search_results': [],
+            'parsing_agent_results': None,
+            'form_data': {},
+            'extracted_documents': [],
+            'current_activity': '',
+            'citations': []
+        }
+        
+        # Start background thread
+        thread = threading.Thread(target=run_automation_workflow_thread, args=(auth_id,))
+        thread.daemon = True
+        thread.start()
+        
+        # Update database status
+        db.start_automation(auth_id)
+        
+        return jsonify({'success': True, 'message': 'Automation started in background'})
     except Exception as e:
         print(f"Error starting automation: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/prior-auths/<int:auth_id>/pause-automation', methods=['POST'])
-def pause_automation(auth_id):
-    """Pause automation for a prior authorization"""
+def run_automation_workflow_thread(auth_id):
+    """Run automation workflow in background thread"""
     try:
-        success = db.pause_automation(auth_id)
-        return jsonify({'success': success})
+        # Get prior authorization data
+        prior_auths = db.get_prior_auths_by_status('all')
+        auth = next((pa for pa in prior_auths if pa['id'] == auth_id), None)
+        
+        if not auth:
+            background_tasks[auth_id]['error'] = 'Prior authorization not found'
+            background_tasks[auth_id]['is_running'] = False
+            return
+        
+        # Run the automation workflow using the insurance analysis module
+        result = run_automation_workflow(auth_id, auth, background_tasks, automation_details, db)
+        
+        if result.get('error'):
+            background_tasks[auth_id]['error'] = result['error']
+            background_tasks[auth_id]['is_running'] = False
+            return
+        
+        # Store coverage results if available
+        if 'coverage_result' in result:
+            background_tasks[auth_id]['results']['coverage'] = result['coverage_result']
+        
+        # Store form results if available
+        if 'form_result' in result:
+            background_tasks[auth_id]['results']['form'] = result['form_result']
+        
     except Exception as e:
-        print(f"Error pausing automation: {e}")
+        print(f"Error in background automation workflow: {e}")
+        background_tasks[auth_id]['error'] = str(e)
+        background_tasks[auth_id]['is_running'] = False
+
+def check_requirements_vs_ehr_data(auth_id, auth, coverage_result):
+    """Check if insurance requirements are met by available EHR data"""
+    try:
+        patient_mrn = auth.get('patient_mrn', '')
+        if not patient_mrn:
+            return {'needs_clinician_input': False, 'missing_requirements': []}
+        
+        # Get EHR data
+        ehr_data = ehr_system.get_patient_data(patient_mrn)
+        
+        # Extract requirements from coverage analysis
+        requirements = coverage_result.get('requirements', [])
+        missing_requirements = []
+        
+        for req in requirements:
+            req_type = req.get('requirement_type', '').lower()
+            req_description = req.get('description', '').lower()
+            
+            # Check specific requirement types
+            if 'genetic counseling' in req_description or 'counseling' in req_type:
+                if not ehr_data.get('genetic_counseling_documentation'):
+                    missing_requirements.append({
+                        'type': 'genetic_counseling',
+                        'description': req.get('description', 'Genetic counseling documentation required'),
+                        'documentation_needed': req.get('documentation_needed', 'Genetic counseling note or referral'),
+                        'clinical_criteria': req.get('clinical_criteria', '')
+                    })
+            
+            elif 'family history' in req_description or 'family' in req_type:
+                if not ehr_data.get('family_history_documentation'):
+                    missing_requirements.append({
+                        'type': 'family_history',
+                        'description': req.get('description', 'Family history documentation required'),
+                        'documentation_needed': req.get('documentation_needed', 'Family history assessment'),
+                        'clinical_criteria': req.get('clinical_criteria', '')
+                    })
+            
+            elif 'clinical indication' in req_description or 'indication' in req_type:
+                if not ehr_data.get('clinical_indication_documentation'):
+                    missing_requirements.append({
+                        'type': 'clinical_indication',
+                        'description': req.get('description', 'Clinical indication documentation required'),
+                        'documentation_needed': req.get('documentation_needed', 'Clinical notes supporting testing'),
+                        'clinical_criteria': req.get('clinical_criteria', '')
+                    })
+            
+            elif 'provider credentials' in req_description or 'credentials' in req_type:
+                if not ehr_data.get('provider_credentials'):
+                    missing_requirements.append({
+                        'type': 'provider_credentials',
+                        'description': req.get('description', 'Provider credentials verification required'),
+                        'documentation_needed': req.get('documentation_needed', 'Provider certification or credentials'),
+                        'clinical_criteria': req.get('clinical_criteria', '')
+                    })
+        
+        return {
+            'needs_clinician_input': len(missing_requirements) > 0,
+            'missing_requirements': missing_requirements,
+            'ehr_data_available': bool(ehr_data)
+        }
+        
+    except Exception as e:
+        print(f"Error checking requirements vs EHR data: {e}")
+        return {'needs_clinician_input': False, 'missing_requirements': []}
+
+def draft_clinician_message(auth_id, auth, missing_requirements):
+    """Draft a message to the clinician requesting missing information"""
+    try:
+        patient_name = auth.get('patient_name', 'Unknown Patient')
+        service_type = auth.get('service_type', 'Genetic Testing')
+        cpt_code = auth.get('cpt_code', 'N/A')
+        
+        # Create message content
+        message_lines = [
+            f"Subject: Prior Authorization - Missing Information Required",
+            "",
+            f"Dear Dr. [Provider Name],",
+            "",
+            f"Regarding prior authorization for {patient_name} (MRN: {auth.get('patient_mrn', 'N/A')}) for {service_type} (CPT: {cpt_code}),",
+            "",
+            "Our automated system has identified that the following documentation is required by the insurance provider but is not currently available in the patient's EHR:",
+            ""
+        ]
+        
+        for i, req in enumerate(missing_requirements, 1):
+            message_lines.extend([
+                f"{i}. {req['description']}",
+                f"   Required Documentation: {req['documentation_needed']}",
+                ""
+            ])
+        
+        message_lines.extend([
+            "Please provide the missing documentation so we can proceed with the prior authorization request.",
+            "",
+            "If you have any questions or need assistance, please contact our prior authorization team.",
+            "",
+            "Thank you,",
+            "Prior Authorization Team"
+        ])
+        
+        return {
+            'subject': f"Prior Authorization - Missing Information for {patient_name}",
+            'content': '\n'.join(message_lines),
+            'missing_requirements': missing_requirements,
+            'patient_name': patient_name,
+            'service_type': service_type,
+            'cpt_code': cpt_code,
+            'auth_id': auth_id
+        }
+        
+    except Exception as e:
+        print(f"Error drafting clinician message: {e}")
+        return {
+            'subject': 'Prior Authorization - Missing Information',
+            'content': 'Error generating message content.',
+            'missing_requirements': missing_requirements,
+            'auth_id': auth_id
+        }
+
+def run_coverage_analysis_in_background(auth_id, auth):
+    """Run coverage analysis in background"""
+    try:
+        # Extract data for analysis
+        cpt_code = auth.get('cpt_code', '')
+        insurance_provider = auth.get('payer', '')
+        service_type = 'genetic testing'
+        
+        # Get patient context
+        patient_mrn = auth.get('patient_mrn', '')
+        patient_context = {}
+        
+        if patient_mrn:
+            try:
+                ehr_data = ehr_system.get_patient_data(patient_mrn)
+                
+                # Check for genetic counseling documentation
+                has_genetic_counseling = False
+                if 'genetics_counseling_and_consent' in ehr_data:
+                    counseling_data = ehr_data['genetics_counseling_and_consent']
+                    has_genetic_counseling = (
+                        counseling_data.get('genetic_counselor') and 
+                        counseling_data.get('counseling_date') and
+                        counseling_data.get('risk_assessment_completed', False)
+                    )
+                
+                # Check for family history documentation
+                has_family_history = False
+                if 'family_history' in ehr_data and ehr_data['family_history']:
+                    has_family_history = len(ehr_data['family_history']) > 0
+                
+                # Check for clinical indication documentation
+                has_clinical_indication = False
+                if 'clinical_notes' in ehr_data and ehr_data['clinical_notes']:
+                    clinical_notes = ehr_data['clinical_notes']
+                    has_clinical_indication = any(
+                        'medical necessity' in note.get('content', '').lower() or
+                        'clinical indication' in note.get('content', '').lower()
+                        for note in clinical_notes
+                    )
+                
+                patient_context = {
+                    'has_genetic_counseling': has_genetic_counseling,
+                    'has_family_history': has_family_history,
+                    'has_clinical_indication': has_clinical_indication,
+                    'provider_credentials_valid': True,
+                    'patient_state': auth.get('patient_state', 'CT')  # Updated to CT
+                }
+                
+                print(f"🔍 Patient context for {patient_mrn}:")
+                print(f"  - Has genetic counseling: {has_genetic_counseling}")
+                print(f"  - Has family history: {has_family_history}")
+                print(f"  - Has clinical indication: {has_clinical_indication}")
+                
+            except Exception as e:
+                print(f"Error getting EHR data: {e}")
+                patient_context = {
+                    'has_genetic_counseling': False,
+                    'has_family_history': False,
+                    'has_clinical_indication': True,
+                    'provider_credentials_valid': True,
+                    'patient_state': auth.get('patient_state', 'CT')
+                }
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 10
+        background_tasks[auth_id]['message'] = 'Determining MAC jurisdiction...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Determine MAC jurisdiction
+        mac_jurisdiction = None
+        if any(medicare_term in insurance_provider.lower() 
+               for medicare_term in ['medicare', 'original medicare', 'cms']):
+            patient_state = patient_context.get('patient_state', 'CA')
+            mac_jurisdiction = enhanced_insurance_analyzer.get_mac_jurisdiction(patient_state)
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 20
+        background_tasks[auth_id]['message'] = 'Generating search queries...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Generate search queries
+        search_queries = enhanced_insurance_analyzer._generate_medicare_search_queries(
+            cpt_code, insurance_provider, service_type, mac_jurisdiction
+        )
+        
+        # Take top 5 queries to avoid timeouts
+        important_queries = search_queries[:5]
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 30
+        background_tasks[auth_id]['message'] = f'Running {len(important_queries)} searches...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Run searches
+        all_search_results = []
+        for i, query in enumerate(important_queries):
+            try:
+                background_tasks[auth_id]['message'] = f'Searching: {query[:50]}...'
+                background_tasks[auth_id]['last_update'] = datetime.now()
+                
+                # Update current activity
+                automation_details[auth_id]['current_activity'] = f'Searching: {query}'
+                
+                search_results = asyncio.run(enhanced_insurance_analyzer._gpt_search(None, query))
+                if search_results:
+                    all_search_results.extend(search_results)
+                    
+                    # Store search results with query context
+                    automation_details[auth_id]['search_results'].append({
+                        'query': query,
+                        'results': search_results,
+                        'timestamp': datetime.now().isoformat()
+                    })
+                    
+                    # Add citations
+                    for result in search_results:
+                        if result.get('url') and result.get('title'):
+                            automation_details[auth_id]['citations'].append({
+                                'source': result.get('source', 'Unknown'),
+                                'url': result.get('url'),
+                                'title': result.get('title'),
+                                'relevance': result.get('relevance', 0),
+                                'type': 'search_result'
+                            })
+                
+                background_tasks[auth_id]['progress'] = 30 + (i * 10)
+                background_tasks[auth_id]['last_update'] = datetime.now()
+                
+            except Exception as e:
+                print(f"Error in search query '{query}': {e}")
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 70
+        background_tasks[auth_id]['message'] = 'Processing search results...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Process and deduplicate results
+        unique_results = enhanced_insurance_analyzer._deduplicate_results(all_search_results)
+        unique_results.sort(key=lambda x: x.get('relevance', 0), reverse=True)
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 80
+        background_tasks[auth_id]['message'] = 'Extracting policy documents...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Extract policy documents
+        automation_details[auth_id]['current_activity'] = 'Extracting policy documents from search results'
+        policy_documents = asyncio.run(enhanced_insurance_analyzer._extract_policy_documents_with_gpt(unique_results[:10]))
+        
+        # Store extracted documents
+        automation_details[auth_id]['extracted_documents'] = policy_documents
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 85
+        background_tasks[auth_id]['message'] = 'Running parsing agent analysis...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Run parsing agent analysis
+        automation_details[auth_id]['current_activity'] = 'Running parsing agent analysis'
+        parsing_agent_result = asyncio.run(enhanced_insurance_analyzer._analyze_documents_with_parsing_agent(
+            unique_results[:10], patient_context, cpt_code, insurance_provider
+        ))
+        
+        # Store parsing agent results
+        automation_details[auth_id]['parsing_agent_results'] = parsing_agent_result
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 90
+        background_tasks[auth_id]['message'] = 'Analyzing coverage and requirements...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Analyze coverage and requirements
+        coverage_info = asyncio.run(enhanced_insurance_analyzer._analyze_coverage_and_requirements_with_gpt(
+            cpt_code, insurance_provider, policy_documents, patient_context, mac_jurisdiction
+        ))
+        
+        # Check patient criteria
+        patient_criteria_match = {}
+        if patient_context:
+            patient_criteria_match = asyncio.run(enhanced_insurance_analyzer._check_patient_criteria_with_gpt(
+                coverage_info.requirements, patient_context
+            ))
+        
+        # Generate recommendations
+        recommendations = asyncio.run(enhanced_insurance_analyzer._generate_recommendations_with_gpt(
+            coverage_info, patient_criteria_match, patient_context
+        ))
+        
+        # Create final result
+        final_result = {
+            'cpt_code': cpt_code,
+            'insurance_provider': insurance_provider,
+            'coverage_status': coverage_info.coverage_status,
+            'coverage_details': coverage_info.coverage_details,
+            'requirements': [
+                {
+                    'requirement_type': req.requirement_type,
+                    'description': req.description,
+                    'evidence_basis': req.evidence_basis,
+                    'documentation_needed': req.documentation_needed,
+                    'clinical_criteria': req.clinical_criteria,
+                    'source_document': req.source_document,
+                    'confidence_score': req.confidence_score
+                }
+                for req in coverage_info.requirements
+            ],
+            'patient_criteria_match': patient_criteria_match,
+            'confidence_score': coverage_info.confidence_score,
+            'search_sources': unique_results[:10],
+            'recommendations': recommendations,
+            'mac_jurisdiction': mac_jurisdiction["name"] if mac_jurisdiction else None,
+            'ncd_applicable': coverage_info.ncd_applicable if hasattr(coverage_info, 'ncd_applicable') else False,
+            'lcd_applicable': coverage_info.lcd_applicable if hasattr(coverage_info, 'lcd_applicable') else False,
+            'parsing_agent_result': parsing_agent_result
+        }
+        
+        return final_result
+        
+    except Exception as e:
+        print(f"Error in coverage analysis: {e}")
+        return {'error': str(e)}
+
+def run_form_completion_in_background(auth_id, auth):
+    """Run form completion in background"""
+    try:
+        # Extract EHR data
+        background_tasks[auth_id]['message'] = 'Extracting EHR data...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        automation_details[auth_id]['current_activity'] = 'Extracting patient data from EHR'
+        
+        # Simulate EHR data extraction with citations
+        patient_mrn = auth.get('patient_mrn', '')
+        ehr_data = {}
+        if patient_mrn:
+            try:
+                ehr_data = ehr_system.get_patient_data(patient_mrn)
+                automation_details[auth_id]['form_data']['patient_info'] = {
+                    'name': auth.get('patient_name', ''),
+                    'mrn': patient_mrn,
+                    'dob': ehr_data.get('patient_admin', {}).get('date_of_birth', 'N/A'),
+                    'gender': ehr_data.get('patient_admin', {}).get('gender', 'N/A'),
+                    'source': 'EHR System - Patient Demographics'
+                }
+                
+                # Add citation for patient data
+                automation_details[auth_id]['citations'].append({
+                    'source': 'EHR System',
+                    'url': f'/api/ehr/patient/{patient_mrn}',
+                    'title': 'Patient Demographics',
+                    'relevance': 100,
+                    'type': 'ehr_data'
+                })
+                
+            except Exception as e:
+                print(f"Error getting EHR data: {e}")
+        
+        time.sleep(1)  # Simulate processing time
+        
+        # Fill form fields
+        background_tasks[auth_id]['progress'] = 60
+        background_tasks[auth_id]['message'] = 'Filling form fields...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        automation_details[auth_id]['current_activity'] = 'Populating form fields with extracted data'
+        
+        automation_details[auth_id]['form_data']['service_info'] = {
+            'service_type': auth.get('service_type', ''),
+            'cpt_code': auth.get('cpt_code', ''),
+            'diagnosis': auth.get('diagnosis', ''),
+            'source': 'Prior Authorization Request'
+        }
+        
+        automation_details[auth_id]['form_data']['insurance_info'] = {
+            'provider': auth.get('payer', ''),
+            'requirements': auth.get('insurance_requirements', ''),
+            'source': 'Insurance Provider Database'
+        }
+        
+        # Add citations for form data
+        automation_details[auth_id]['citations'].append({
+            'source': 'Prior Auth Request',
+            'url': f'/api/prior-auths/{auth_id}',
+            'title': 'Service Information',
+            'relevance': 100,
+            'type': 'form_data'
+        })
+        
+        time.sleep(1)  # Simulate processing time
+        
+        # Validate form data
+        background_tasks[auth_id]['progress'] = 80
+        background_tasks[auth_id]['message'] = 'Validating form data...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        automation_details[auth_id]['current_activity'] = 'Validating form data against requirements'
+        
+        # Simulate validation
+        validation_errors = []
+        if not auth.get('cpt_code'):
+            validation_errors.append('CPT code is required')
+        
+        automation_details[auth_id]['form_data']['validation'] = {
+            'errors': validation_errors,
+            'status': 'valid' if not validation_errors else 'invalid',
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        time.sleep(1)  # Simulate processing time
+        
+        # Return form completion result
+        return {
+            'form_data': automation_details[auth_id]['form_data'],
+            'validation_errors': validation_errors,
+            'submission_ready': len(validation_errors) == 0
+        }
+        
+    except Exception as e:
+        print(f"Error in form completion: {e}")
+        return {'error': str(e)}
+
+
+
+@app.route('/api/prior-auths/<int:auth_id>/cancel-automation', methods=['POST'])
+def cancel_automation(auth_id):
+    """Cancel automation for a prior authorization"""
+    try:
+        # Remove from background tasks
+        if auth_id in background_tasks:
+            background_tasks[auth_id]['is_running'] = False
+            background_tasks[auth_id]['error'] = 'Cancelled by user'
+        
+        if auth_id in automation_details:
+            del automation_details[auth_id]
+        
+        # Update database status
+        db.update_prior_auth_status(auth_id, 'pending')
+        
+        return jsonify({'success': True, 'message': 'Automation cancelled'})
+    except Exception as e:
+        print(f"Error cancelling automation: {e}")
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/prior-auths/<int:auth_id>/send-clinician-message', methods=['POST'])
+def send_clinician_message(auth_id):
+    """Send clinician message and mark case as deferred"""
+    try:
+        # Get the clinician message from automation details
+        if auth_id not in automation_details or 'clinician_message' not in automation_details[auth_id]:
+            return jsonify({'success': False, 'error': 'No clinician message found'})
+        
+        clinician_message = automation_details[auth_id]['clinician_message']
+        
+        # In a real system, this would send the message via EPIC or other messaging system
+        # For demo purposes, we'll just log it
+        print(f"Sending clinician message for auth {auth_id}:")
+        print(f"Subject: {clinician_message['subject']}")
+        print(f"Content: {clinician_message['content']}")
+        
+        # Mark case as deferred
+        db.update_prior_auth_status(auth_id, 'deferred')
+        
+        # Update automation details to indicate message was sent
+        automation_details[auth_id]['clinician_message_sent'] = True
+        automation_details[auth_id]['message_sent_date'] = datetime.now().isoformat()
+        
+        # Update background task status
+        if auth_id in background_tasks:
+            background_tasks[auth_id]['message'] = 'Clinician message sent - case deferred'
+            background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Clinician message sent and case marked as deferred',
+            'clinician_message': clinician_message
+        })
+        
+    except Exception as e:
+        print(f"Error sending clinician message: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/prior-auths/<int:auth_id>/resume-automation', methods=['POST'])
+def resume_automation(auth_id):
+    """Resume automation after clinician provides missing information"""
+    try:
+        # Check if case is in deferred status
+        auth = db.get_prior_auth_by_id(auth_id)
+        if not auth or auth.get('status') != 'deferred':
+            return jsonify({'success': False, 'error': 'Case not in deferred status'})
+        
+        # Reset automation state
+        if auth_id in automation_details:
+            # Clear clinician message data
+            automation_details[auth_id].pop('clinician_message', None)
+            automation_details[auth_id].pop('missing_requirements', None)
+            automation_details[auth_id].pop('needs_clinician_input', None)
+            automation_details[auth_id].pop('clinician_message_sent', None)
+            automation_details[auth_id].pop('message_sent_date', None)
+        
+        # Restart automation from step 2 (form completion)
+        background_tasks[auth_id] = {
+            'is_running': True,
+            'current_step': 2,
+            'progress': 50,
+            'message': 'Resuming automation - starting form completion...',
+            'start_time': datetime.now(),
+            'last_update': datetime.now(),
+            'results': {},
+            'error': None
+        }
+        
+        # Start background thread for form completion
+        thread = threading.Thread(target=run_form_completion_only, args=(auth_id, auth))
+        thread.daemon = True
+        thread.start()
+        
+        # Update database status
+        db.update_prior_auth_status(auth_id, 'running')
+        
+        return jsonify({'success': True, 'message': 'Automation resumed'})
+        
+    except Exception as e:
+        print(f"Error resuming automation: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+def run_form_completion_only(auth_id, auth):
+    """Run only form completion step (for resumed automations)"""
+    try:
+        form_result = run_form_completion_in_background(auth_id, auth)
+        
+        if 'error' in form_result:
+            background_tasks[auth_id]['error'] = form_result['error']
+            background_tasks[auth_id]['is_running'] = False
+            return
+        
+        # Complete automation
+        background_tasks[auth_id]['progress'] = 100
+        background_tasks[auth_id]['message'] = 'Automation completed successfully!'
+        background_tasks[auth_id]['is_running'] = False
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Update database status
+        db.update_prior_auth_status(auth_id, 'completed')
+        
+    except Exception as e:
+        print(f"Error in form completion only: {e}")
+        background_tasks[auth_id]['error'] = str(e)
+        background_tasks[auth_id]['is_running'] = False
 
 @app.route('/api/prior-auths/<int:auth_id>/approve-step', methods=['POST'])
 def approve_step(auth_id):
@@ -291,13 +931,57 @@ def validate_coverage():
         return jsonify({'error': str(e)}), 500
 
 # Workflow Status Endpoint
+@app.route('/api/automation/status/<int:auth_id>')
+def get_automation_status(auth_id):
+    """Get current automation status for a prior authorization"""
+    try:
+        if auth_id not in background_tasks:
+            return jsonify({
+                'is_running': False,
+                'error': 'No automation found for this authorization'
+            })
+        
+        task = background_tasks[auth_id]
+        details = automation_details.get(auth_id, {})
+        
+        return jsonify({
+            'is_running': task['is_running'],
+            'current_step': task['current_step'],
+            'progress': task['progress'],
+            'message': task['message'],
+            'start_time': task['start_time'].isoformat() if task['start_time'] else None,
+            'last_update': task['last_update'].isoformat() if task['last_update'] else None,
+            'results': task['results'],
+            'error': task['error'],
+            'details': details
+        })
+    except Exception as e:
+        print(f"Error getting automation status: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reset-all-cases', methods=['POST'])
+def reset_all_cases():
+    """Reset all cases to pending status and clear background tasks"""
+    try:
+        # Clear all background tasks
+        global background_tasks, automation_details
+        background_tasks.clear()
+        automation_details.clear()
+        
+        # Reset all cases to pending in database
+        db.reset_all_to_pending()
+        
+        return jsonify({'success': True, 'message': 'All cases reset to pending status'})
+    except Exception as e:
+        print(f"Error resetting cases: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/automation/workflow-status/<int:auth_id>')
 def get_workflow_status(auth_id):
     """Get current workflow status for a prior authorization"""
     try:
         prior_auths = db.get_prior_auths_by_status('all')
         auth = next((pa for pa in prior_auths if pa['id'] == auth_id), None)
-        
         if not auth:
             return jsonify({'error': 'Prior authorization not found'}), 404
         
@@ -641,10 +1325,130 @@ def gpt5_search_stream(auth_id):
                    mimetype='text/event-stream',
                    headers={'Cache-Control': 'no-cache', 'Connection': 'keep-alive'})
 
-# Form Completion Streaming Endpoint
+# Interactive Form Editor Endpoints
+
+@app.route('/api/form-session/create', methods=['POST'])
+def create_form_session():
+    """Create a new interactive form editing session"""
+    try:
+        data = request.get_json()
+        auth_id = data.get('auth_id')
+        patient_mrn = data.get('patient_mrn')
+        insurance_provider = data.get('insurance_provider')
+        cpt_code = data.get('cpt_code')
+        coverage_analysis = data.get('coverage_analysis')
+        
+        if not all([auth_id, patient_mrn, insurance_provider, cpt_code]):
+            return jsonify({'success': False, 'error': 'Missing required parameters'})
+        
+        session = form_editor.create_form_session(
+            auth_id, patient_mrn, insurance_provider, cpt_code, coverage_analysis
+        )
+        
+        return jsonify({
+            'success': True,
+            'session_id': session['session_id'],
+            'session': session
+        })
+    except Exception as e:
+        print(f"Error creating form session: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/form-session/<session_id>/update-field', methods=['POST'])
+def update_form_field(session_id):
+    """Update a specific form field"""
+    try:
+        data = request.get_json()
+        section_id = data.get('section_id')
+        field_id = data.get('field_id')
+        value = data.get('value')
+        source = data.get('source', 'human_edit')
+        
+        if not all([section_id, field_id, value]):
+            return jsonify({'success': False, 'error': 'Missing required parameters'})
+        
+        result = form_editor.update_form_field(session_id, section_id, field_id, value, source)
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error updating form field: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/form-session/<session_id>/request-help', methods=['POST'])
+def request_expert_help(session_id):
+    """Request help from human expert for a specific field"""
+    try:
+        data = request.get_json()
+        field_id = data.get('field_id')
+        question = data.get('question')
+        context = data.get('context')
+        
+        if not all([field_id, question]):
+            return jsonify({'success': False, 'error': 'Missing required parameters'})
+        
+        result = form_editor.request_expert_help(session_id, field_id, question, context)
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error requesting expert help: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/form-session/<session_id>/search-ehr', methods=['POST'])
+def search_ehr_for_field(session_id):
+    """Search EHR for information to fill a specific field"""
+    try:
+        data = request.get_json()
+        field_id = data.get('field_id')
+        search_terms = data.get('search_terms')
+        
+        if not field_id:
+            return jsonify({'success': False, 'error': 'Missing field_id parameter'})
+        
+        result = form_editor.search_ehr_for_field(session_id, field_id, search_terms)
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error searching EHR: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/form-session/<session_id>/draft-form-message', methods=['POST'])
+def draft_form_clinician_message(session_id):
+    """Draft a message to the clinician requesting missing information for form fields"""
+    try:
+        data = request.get_json()
+        field_id = data.get('field_id')
+        missing_info = data.get('missing_info')
+        
+        if not all([field_id, missing_info]):
+            return jsonify({'success': False, 'error': 'Missing required parameters'})
+        
+        result = form_editor.draft_clinician_message(session_id, field_id, missing_info)
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error drafting clinician message: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/form-session/<session_id>/status')
+def get_form_session_status(session_id):
+    """Get current status of the form editing session"""
+    try:
+        result = form_editor.get_session_status(session_id)
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error getting session status: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/form-session/<session_id>/finalize', methods=['POST'])
+def finalize_form(session_id):
+    """Finalize the form for submission"""
+    try:
+        result = form_editor.finalize_form(session_id)
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error finalizing form: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+# Enhanced Form Completion Streaming Endpoint
 @app.route('/api/prior-auths/<int:auth_id>/form-completion-stream', methods=['POST'])
 def form_completion_stream(auth_id):
-    """Stream form completion with EHR data extraction"""
+    """Stream form completion with EHR data extraction using new form manager"""
     from flask import Response, stream_with_context
     import json
     
@@ -664,100 +1468,59 @@ def form_completion_stream(auth_id):
             patient_mrn = auth.get('patient_mrn', '')
             
             # Send initial status
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Starting form completion with EHR data extraction...', 'progress': 0})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Starting enhanced form completion with EHR data extraction...', 'progress': 0})}\n\n"
             
-            # Get patient EHR data
-            patient_data = {}
-            if patient_mrn:
-                try:
-                    patient_data = ehr_system.get_patient_data(patient_mrn)
-                    yield f"data: {json.dumps({'type': 'status', 'message': 'Retrieved patient EHR data', 'progress': 20})}\n\n"
-                except Exception as e:
-                    print(f"Error getting EHR data: {e}")
-                    yield f"data: {json.dumps({'type': 'status', 'message': 'Warning: Could not retrieve EHR data', 'progress': 20})}\n\n"
+            # Get form template
+            form_template = form_manager.get_form_template(insurance_provider, cpt_code)
+            yield f"data: {json.dumps({'type': 'status', 'message': f'Using form template: {form_template["name"]}', 'progress': 10})}\n\n"
             
-            # Extract key EHR fields
-            ehr_fields = [
-                ('patient_name', 'Patient Name'),
-                ('patient_dob', 'Date of Birth'),
-                ('diagnosis', 'Diagnosis'),
-                ('stage', 'Cancer Stage'),
-                ('provider_name', 'Ordering Provider'),
-                ('facility', 'Facility'),
-                ('procedure_date', 'Procedure Date')
-            ]
+            # Extract EHR data using form manager
+            extracted_data = form_manager.extract_ehr_data_for_form(patient_mrn, form_template)
             
-            extracted_data = {}
-            for i, (field_key, field_name) in enumerate(ehr_fields):
-                try:
-                    # Simulate EHR extraction
-                    if field_key in patient_data:
-                        value = patient_data[field_key]
+            if 'error' in extracted_data:
+                yield f"data: {json.dumps({'type': 'error', 'error': extracted_data['error'], 'progress': 20})}\n\n"
+                return
+            
+            yield f"data: {json.dumps({'type': 'status', 'message': 'EHR data extraction complete', 'progress': 30})}\n\n"
+            
+            # Process each section and field
+            total_fields = sum(len(section['fields']) for section in form_template['sections'])
+            processed_fields = 0
+            
+            for section in form_template['sections']:
+                section_data = extracted_data['patient_info'].get(section['id'], {})
+                
+                for field in section['fields']:
+                    field_id = field['id']
+                    field_data = section_data.get(field_id, {})
+                    
+                    if field_data.get('value'):
+                        yield f"data: {json.dumps({'type': 'form_field', 'field': field['label'], 'value': field_data['value'], 'justification': f'Extracted from EHR: {field_data["source"]}', 'sources': [field_data['source']], 'progress': 40 + (processed_fields * 2)})}\n\n"
                     else:
-                        value = auth.get(field_key, 'Not found in EHR')
+                        yield f"data: {json.dumps({'type': 'form_field', 'field': field['label'], 'value': 'Not found', 'justification': 'Field not found in EHR', 'sources': ['Not available'], 'progress': 40 + (processed_fields * 2)})}\n\n"
                     
-                    source = 'EHR System'
-                    citation = f"Patient record {patient_mrn}, field: {field_key}"
-                    
-                    extracted_data[field_key] = {
-                        'value': value,
-                        'source': source,
-                        'citation': citation
-                    }
-                    
-                    yield f"data: {json.dumps({'type': 'ehr_extraction', 'field': field_name, 'value': value, 'source': source, 'citation': citation, 'progress': 30 + (i * 5)})}\n\n"
-                    
-                except Exception as e:
-                    print(f"Error extracting {field_name}: {e}")
-                    yield f"data: {json.dumps({'type': 'ehr_extraction', 'field': field_name, 'value': 'Error extracting data', 'source': 'Error', 'citation': str(e), 'progress': 30 + (i * 5)})}\n\n"
-            
-            # Fill form fields using policy analysis and EHR data
-            form_fields = [
-                ('patient_name', 'Patient Name', extracted_data.get('patient_name', {}).get('value', '')),
-                ('cpt_code', 'CPT Code', cpt_code),
-                ('diagnosis', 'Diagnosis', extracted_data.get('diagnosis', {}).get('value', '')),
-                ('clinical_indication', 'Clinical Indication', 'Advanced cancer requiring targeted therapy'),
-                ('provider_name', 'Ordering Provider', extracted_data.get('provider_name', {}).get('value', '')),
-                ('facility', 'Facility', extracted_data.get('facility', {}).get('value', ''))
-            ]
-            
-            for i, (field_key, field_name, value) in enumerate(form_fields):
-                try:
-                    justification = f"Based on EHR data and policy requirements for {cpt_code}"
-                    sources = ['EHR System', 'Policy Analysis']
-                    
-                    yield f"data: {json.dumps({'type': 'form_field', 'field': field_name, 'value': value, 'justification': justification, 'sources': sources, 'progress': 60 + (i * 5)})}\n\n"
-                    
-                except Exception as e:
-                    print(f"Error filling form field {field_name}: {e}")
-                    yield f"data: {json.dumps({'type': 'form_field', 'field': field_name, 'value': 'Error', 'justification': 'Error occurred', 'sources': ['Error'], 'progress': 60 + (i * 5)})}\n\n"
+                    processed_fields += 1
             
             # Create final form result
-            form_sections = [
-                {
-                    'title': 'Patient Information',
-                    'fields': [
-                        {'label': 'Patient Name', 'value': extracted_data.get('patient_name', {}).get('value', ''), 'sources': ['EHR']},
-                        {'label': 'Date of Birth', 'value': extracted_data.get('patient_dob', {}).get('value', ''), 'sources': ['EHR']},
-                        {'label': 'MRN', 'value': patient_mrn, 'sources': ['EHR']}
-                    ]
-                },
-                {
-                    'title': 'Service Information',
-                    'fields': [
-                        {'label': 'CPT Code', 'value': cpt_code, 'sources': ['Request']},
-                        {'label': 'Diagnosis', 'value': extracted_data.get('diagnosis', {}).get('value', ''), 'sources': ['EHR']},
-                        {'label': 'Clinical Indication', 'value': 'Advanced cancer requiring targeted therapy', 'sources': ['Policy Analysis']}
-                    ]
-                },
-                {
-                    'title': 'Provider Information',
-                    'fields': [
-                        {'label': 'Ordering Provider', 'value': extracted_data.get('provider_name', {}).get('value', ''), 'sources': ['EHR']},
-                        {'label': 'Facility', 'value': extracted_data.get('facility', {}).get('value', ''), 'sources': ['EHR']}
-                    ]
-                }
-            ]
+            form_sections = []
+            for section in form_template['sections']:
+                section_data = extracted_data['patient_info'].get(section['id'], {})
+                section_fields = []
+                
+                for field in section['fields']:
+                    field_id = field['id']
+                    field_data = section_data.get(field_id, {})
+                    
+                    section_fields.append({
+                        'label': field['label'],
+                        'value': field_data.get('value', ''),
+                        'sources': [field_data.get('source', 'Not available')]
+                    })
+                
+                form_sections.append({
+                    'title': section['title'],
+                    'fields': section_fields
+                })
             
             ehr_citations = [
                 {'field': 'Patient Name', 'value': extracted_data.get('patient_name', {}).get('value', ''), 'source': 'EHR System'},

@@ -144,89 +144,89 @@ class EnhancedInsuranceAnalysis:
         
         return None
         
-    async def analyze_insurance_coverage_and_requirements(
-        self, 
-        cpt_code: str, 
-        insurance_provider: str, 
-        service_type: str,
-        patient_context: Optional[Dict] = None,
-        patient_address: Optional[str] = None
-    ) -> CoverageAnalysis:
-        """
-        Main method that combines coverage determination and requirements extraction.
+    # async def analyze_insurance_coverage_and_requirements(
+    #     self, 
+    #     cpt_code: str, 
+    #     insurance_provider: str, 
+    #     service_type: str,
+    #     patient_context: Optional[Dict] = None,
+    #     patient_address: Optional[str] = None
+    # ) -> CoverageAnalysis:
+    #     """
+    #     Main method that combines coverage determination and requirements extraction.
         
-        Args:
-            cpt_code: CPT code for the service
-            insurance_provider: Name of insurance provider
-            service_type: Type of service (e.g., "genetic testing", "imaging")
-            patient_context: Optional patient context for criteria matching
-            patient_address: Optional patient address for state extraction
+    #     Args:
+    #         cpt_code: CPT code for the service
+    #         insurance_provider: Name of insurance provider
+    #         service_type: Type of service (e.g., "genetic testing", "imaging")
+    #         patient_context: Optional patient context for criteria matching
+    #         patient_address: Optional patient address for state extraction
             
-        Returns:
-            CoverageAnalysis object with comprehensive results
-        """
+    #     Returns:
+    #         CoverageAnalysis object with comprehensive results
+    #     """
         
-        # Determine MAC jurisdiction for Medicare patients
-        mac_jurisdiction = None
-        if any(medicare_term in insurance_provider.lower() 
-               for medicare_term in ['medicare', 'original medicare', 'cms']):
+    #     # Determine MAC jurisdiction for Medicare patients
+    #     mac_jurisdiction = None
+    #     if any(medicare_term in insurance_provider.lower() 
+    #            for medicare_term in ['medicare', 'original medicare', 'cms']):
             
-            # Try to get state from patient context first
-            patient_state = None
-            if patient_context and patient_context.get('patient_state'):
-                patient_state = patient_context.get('patient_state')
-            elif patient_address:
-                # Extract state from address if not in context
-                patient_state = self.extract_patient_state_from_address(patient_address)
+    #         # Try to get state from patient context first
+    #         patient_state = None
+    #         if patient_context and patient_context.get('patient_state'):
+    #             patient_state = patient_context.get('patient_state')
+    #         elif patient_address:
+    #             # Extract state from address if not in context
+    #             patient_state = self.extract_patient_state_from_address(patient_address)
             
-            if patient_state:
-                mac_jurisdiction = self.get_mac_jurisdiction(patient_state)
+    #         if patient_state:
+    #             mac_jurisdiction = self.get_mac_jurisdiction(patient_state)
         
-        # Step 1: Search for medical policy documents using GPT-5 search mode
-        print(f"🔍 Starting insurance analysis for CPT {cpt_code}, Provider: {insurance_provider}")
-        if mac_jurisdiction:
-            print(f"🏛️  MAC Jurisdiction: {mac_jurisdiction['name']} ({mac_jurisdiction['jurisdiction_id']})")
+    #     # Step 1: Search for medical policy documents using GPT-5 search mode
+    #     print(f"🔍 Starting insurance analysis for CPT {cpt_code}, Provider: {insurance_provider}")
+    #     if mac_jurisdiction:
+    #         print(f"🏛️  MAC Jurisdiction: {mac_jurisdiction['name']} ({mac_jurisdiction['jurisdiction_id']})")
         
-        search_results = await self._search_medical_policies_with_gpt5(
-            cpt_code, insurance_provider, service_type, mac_jurisdiction
-        )
+    #     search_results = await self._search_medical_policies_with_gpt5(
+    #         cpt_code, insurance_provider, service_type, mac_jurisdiction
+    #     )
         
-        print(f"📊 Found {len(search_results)} search results")
+    #     print(f"📊 Found {len(search_results)} search results")
         
-        # Step 2: Extract and parse policy documents using GPT
-        policy_documents = await self._extract_policy_documents_with_gpt(search_results)
+    #     # Step 2: Extract and parse policy documents using GPT
+    #     policy_documents = await self._extract_policy_documents_with_gpt(search_results)
         
-        # Step 3: Analyze coverage and extract requirements using GPT
-        coverage_info = await self._analyze_coverage_and_requirements_with_gpt(
-            cpt_code, insurance_provider, policy_documents, patient_context, mac_jurisdiction
-        )
+    #     # Step 3: Analyze coverage and extract requirements using GPT
+    #     coverage_info = await self._analyze_coverage_and_requirements_with_gpt(
+    #         cpt_code, insurance_provider, policy_documents, patient_context, mac_jurisdiction
+    #     )
         
-        # Step 4: Check patient criteria against requirements
-        patient_criteria_match = {}
-        if patient_context:
-            patient_criteria_match = await self._check_patient_criteria_with_gpt(
-                coverage_info.requirements, patient_context
-            )
+    #     # Step 4: Check patient criteria against requirements
+    #     patient_criteria_match = {}
+    #     if patient_context:
+    #         patient_criteria_match = await self._check_patient_criteria_with_gpt(
+    #             coverage_info.requirements, patient_context
+    #         )
         
-        # Step 5: Generate recommendations using GPT
-        recommendations = await self._generate_recommendations_with_gpt(
-            coverage_info, patient_criteria_match, patient_context
-        )
+    #     # Step 5: Generate recommendations using GPT
+    #     recommendations = await self._generate_recommendations_with_gpt(
+    #         coverage_info, patient_criteria_match, patient_context
+    #     )
         
-        return CoverageAnalysis(
-            cpt_code=cpt_code,
-            insurance_provider=insurance_provider,
-            coverage_status=coverage_info.coverage_status,
-            coverage_details=coverage_info.coverage_details,
-            requirements=coverage_info.requirements,
-            patient_criteria_match=patient_criteria_match,
-            confidence_score=coverage_info.confidence_score,
-            search_sources=search_results,
-            recommendations=recommendations,
-            mac_jurisdiction=mac_jurisdiction["name"] if mac_jurisdiction else None,
-            ncd_applicable=coverage_info.ncd_applicable if hasattr(coverage_info, 'ncd_applicable') else False,
-            lcd_applicable=coverage_info.lcd_applicable if hasattr(coverage_info, 'lcd_applicable') else False
-        )
+    #     return CoverageAnalysis(
+    #         cpt_code=cpt_code,
+    #         insurance_provider=insurance_provider,
+    #         coverage_status=coverage_info.coverage_status,
+    #         coverage_details=coverage_info.coverage_details,
+    #         requirements=coverage_info.requirements,
+    #         patient_criteria_match=patient_criteria_match,
+    #         confidence_score=coverage_info.confidence_score,
+    #         search_sources=search_results,
+    #         recommendations=recommendations,
+    #         mac_jurisdiction=mac_jurisdiction["name"] if mac_jurisdiction else None,
+    #         ncd_applicable=coverage_info.ncd_applicable if hasattr(coverage_info, 'ncd_applicable') else False,
+    #         lcd_applicable=coverage_info.lcd_applicable if hasattr(coverage_info, 'lcd_applicable') else False
+    #     )
     
     async def _search_medical_policies_with_gpt5(
         self, 
@@ -712,6 +712,8 @@ class EnhancedInsuranceAnalysis:
         """
         Parse GPT-4o-mini-search-preview response and extract structured results.
         """
+        import re
+        
         try:
             # Extract content from GPT-4o-mini-search-preview response
             content = response.choices[0].message.content
@@ -727,15 +729,27 @@ class EnhancedInsuranceAnalysis:
                 try:
                     results = json.loads(json_str)
                     if isinstance(results, list):
-                        # Validate and filter results to remove hallucinations
-                        # validated_results = self._validate_search_results(results, query)
-                        # print(f"✅ Successfully parsed {len(results)} results, validated {len(validated_results)} real results")
+                        print(f"✅ Successfully parsed {len(results)} JSON results")
                         return results
                     else:
                         print(f"⚠️  Parsed JSON is not a list: {type(results)}")
                 except json.JSONDecodeError as e:
                     print(f"❌ JSON decode error: {e}")
                     print(f"📋 JSON string preview: {json_str[:200]}...")
+                    
+                    # Try to clean up common JSON issues
+                    try:
+                        # Remove markdown formatting that might be mixed in
+                        cleaned_json = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', json_str)
+                        cleaned_json = re.sub(r'```json\s*', '', cleaned_json)
+                        cleaned_json = re.sub(r'\s*```', '', cleaned_json)
+                        
+                        results = json.loads(cleaned_json)
+                        if isinstance(results, list):
+                            print(f"✅ Successfully parsed {len(results)} results after cleanup")
+                            return results
+                    except:
+                        print(f"⚠️  JSON cleanup also failed")
             
             # If JSON parsing fails, try to extract structured information
             print(f"🔄 Falling back to text extraction for query: {query}")
@@ -831,48 +845,107 @@ class EnhancedInsuranceAnalysis:
     def _extract_structured_results_from_text(self, text: str, query: str) -> List[Dict]:
         """
         Extract structured search results from GPT text response.
+        Handles both structured text and markdown-formatted responses.
         """
         results = []
         
-        # Look for patterns that indicate search results
-        lines = text.split('\n')
-        current_result = {}
+        # First, try to extract markdown links if present
+        import re
         
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
+        # Look for markdown links: [text](url)
+        markdown_links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', text)
+        
+        if markdown_links:
+            print(f"🔍 Found {len(markdown_links)} markdown links in response")
+            for i, (title, url) in enumerate(markdown_links):
+                # Skip only if it's just a bare domain name without any descriptive text
+                # But keep domain names that are part of actual document titles
+                if (title.lower() in ['cms.gov', 'medicare.gov', 'fda.gov', 'nccn.org', 'asco.org'] and 
+                    len(title) <= 20):  # Only skip if it's a short domain name
+                    print(f"⏭️  Skipping bare domain: {title}")
+                    continue
+                    
+                # Clean up the title if it's a domain name but has a longer description
+                clean_title = title
+                if title.lower() in ['cms.gov', 'medicare.gov', 'fda.gov', 'nccn.org', 'asco.org']:
+                    # Extract a better title from the URL or use a generic one
+                    if 'medicare-coverage-database' in url:
+                        clean_title = 'Medicare Coverage Database Article'
+                    elif 'medicare.gov' in url:
+                        clean_title = 'Medicare.gov Policy Document'
+                    elif 'fda.gov' in url:
+                        clean_title = 'FDA Policy Document'
+                    elif 'nccn.org' in url:
+                        clean_title = 'NCCN Clinical Practice Guidelines'
+                    elif 'asco.org' in url:
+                        clean_title = 'ASCO Clinical Practice Guidelines'
+                    else:
+                        clean_title = f'Policy Document from {title}'
                 
-            if line.startswith('Title:') or line.startswith('Name:'):
-                if current_result:
-                    results.append(current_result)
-                current_result = {'title': line.split(':', 1)[1].strip()}
-            elif line.startswith('URL:') or line.startswith('Link:'):
-                current_result['url'] = line.split(':', 1)[1].strip()
-            elif line.startswith('Snippet:') or line.startswith('Description:'):
-                current_result['snippet'] = line.split(':', 1)[1].strip()
-            elif line.startswith('Relevance:') or line.startswith('Score:'):
-                try:
-                    relevance = int(line.split(':', 1)[1].strip().replace('%', ''))
-                    current_result['relevance'] = relevance
-                except:
-                    current_result['relevance'] = 80
-            elif line.startswith('Type:') or line.startswith('Category:'):
-                current_result['type'] = line.split(':', 1)[1].strip()
-            elif line.startswith('Source:') or line.startswith('Provider:'):
-                current_result['source'] = line.split(':', 1)[1].strip()
+                result = {
+                    'title': clean_title,
+                    'url': url,
+                    'snippet': f'Policy document related to {query}',
+                    'relevance': 85 - (i * 5),  # Decreasing relevance for each result
+                    'type': 'policy_document',
+                    'source': 'GPT Search'
+                }
+                results.append(result)
+                print(f"✅ Added result: {clean_title}")
         
-        # Add the last result
-        if current_result:
-            results.append(current_result)
+        # If no markdown links found, try structured text parsing
+        if not results:
+            lines = text.split('\n')
+            current_result = {}
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                if line.startswith('Title:') or line.startswith('Name:'):
+                    if current_result:
+                        results.append(current_result)
+                    current_result = {'title': line.split(':', 1)[1].strip()}
+                elif line.startswith('URL:') or line.startswith('Link:'):
+                    current_result['url'] = line.split(':', 1)[1].strip()
+                elif line.startswith('Snippet:') or line.startswith('Description:'):
+                    current_result['snippet'] = line.split(':', 1)[1].strip()
+                elif line.startswith('Relevance:') or line.startswith('Score:'):
+                    try:
+                        relevance = int(line.split(':', 1)[1].strip().replace('%', ''))
+                        current_result['relevance'] = relevance
+                    except:
+                        current_result['relevance'] = 80
+                elif line.startswith('Type:') or line.startswith('Category:'):
+                    current_result['type'] = line.split(':', 1)[1].strip()
+                elif line.startswith('Source:') or line.startswith('Provider:'):
+                    current_result['source'] = line.split(':', 1)[1].strip()
+            
+            # Add the last result
+            if current_result:
+                results.append(current_result)
+        
+        # If still no results, create a fallback result based on the query
+        if not results:
+            print(f"⚠️  No structured results found, creating fallback for query: {query}")
+            results.append({
+                'title': f'Policy document for {query}',
+                'url': f'https://www.cms.gov/search?q={query.replace(" ", "+")}',
+                'snippet': f'Search results for {query}',
+                'relevance': 70,
+                'type': 'policy_document',
+                'source': 'Fallback'
+            })
         
         # Add default values for missing fields
         for result in results:
             result.setdefault('relevance', 80)
             result.setdefault('type', 'policy_document')
-            result.setdefault('source', 'Unknown')
+            result.setdefault('source', result.get('source', 'Unknown'))
         
-        return results if results else []
+        print(f"📊 Extracted {len(results)} results from text parsing")
+        return results
     
     async def _extract_policy_documents_with_gpt(self, search_results: List[Dict]) -> List[Dict]:
         """
@@ -1460,6 +1533,8 @@ class EnhancedInsuranceAnalysis:
                 print("❌ Unknown response format")
                 return self._create_fallback_parsing_result()
             
+            print(f"🔍 Parsing agent response content: {content[:500]}...")
+            
             # Try to extract JSON from the response
             if '{' in content and '}' in content:
                 start_idx = content.find('{')
@@ -1468,11 +1543,23 @@ class EnhancedInsuranceAnalysis:
                     json_str = content[start_idx:end_idx]
                     try:
                         result = json.loads(json_str)
+                        print(f"✅ Successfully parsed JSON from parsing agent response")
+                        
+                        # Validate that required fields are present
+                        if 'request_validation' not in result:
+                            result['request_validation'] = {'is_valid': False, 'missing_documents': [], 'validation_notes': 'Missing validation data'}
+                        if 'clinician_message' not in result:
+                            result['clinician_message'] = 'Additional documentation required. Please contact the prior authorization team.'
+                        if 'critical_requirements' not in result:
+                            result['critical_requirements'] = []
+                            
                         return result
                     except json.JSONDecodeError as e:
                         print(f"❌ JSON decode error in parsing agent response: {e}")
+                        print(f"🔍 JSON string: {json_str}")
             
             # Fallback: extract structured information from text
+            print(f"⚠️  Falling back to text extraction for parsing agent response")
             return self._extract_parsing_info_from_text(content, relevant_docs)
             
         except Exception as e:
@@ -1527,6 +1614,509 @@ class EnhancedInsuranceAnalysis:
         Create a fallback result when parsing agent fails.
         """
         return DEFAULT_PARSING_RESULT
+    
+    def _deduplicate_search_results(self, search_results: List[Dict]) -> List[Dict]:
+        """
+        Deduplicate search results based on URL and title.
+        
+        Args:
+            search_results: List of search result dictionaries
+            
+        Returns:
+            List of deduplicated search results
+        """
+        seen_urls = set()
+        seen_titles = set()
+        unique_results = []
+        
+        for result in search_results:
+            url = result.get('url', '').lower()
+            title = result.get('title', '').lower()
+            
+            # Skip if we've seen this URL or title before
+            if url in seen_urls or title in seen_titles:
+                continue
+            
+            # Add to seen sets
+            seen_urls.add(url)
+            seen_titles.add(title)
+            unique_results.append(result)
+        
+        print(f"🔍 Deduplicated {len(search_results)} results to {len(unique_results)} unique results")
+        return unique_results
+    
+    async def _extract_policy_documents(self, search_results: List[Dict]) -> List[Dict]:
+        """
+        Extract policy documents from search results by analyzing each result.
+        
+        Args:
+            search_results: List of search result dictionaries
+            
+        Returns:
+            List of extracted policy documents with detailed information
+        """
+        policy_documents = []
+        
+        for result in search_results:
+            try:
+                # Analyze the document using GPT
+                analysis_result = await self._analyze_document_with_gpt(result)
+                if analysis_result:
+                    policy_documents.append(analysis_result)
+                    print(f"✅ Policy document parsing successful for: {result.get('title', 'Unknown')}")
+            except Exception as e:
+                print(f"❌ Error analyzing document {result.get('title', 'Unknown')}: {e}")
+                continue
+        
+        print(f"📊 Successfully parsed {len(policy_documents)} policy documents")
+        return policy_documents
+    
+    async def _analyze_document_with_gpt(self, search_result: Dict) -> Optional[Dict]:
+        """
+        Analyze a single document using GPT to extract policy information.
+        
+        Args:
+            search_result: Single search result dictionary
+            
+        Returns:
+            Dictionary with extracted policy information or None if analysis fails
+        """
+        try:
+            # Create analysis prompt
+            prompt = create_medicare_document_analysis_prompt(search_result)
+            
+            # Get GPT response
+            response = await self._get_gpt_response(prompt)
+            if not response:
+                return None
+            
+            # Parse the response
+            analysis_result = self._parse_document_analysis_response(response, search_result)
+            return analysis_result
+            
+        except Exception as e:
+            print(f"❌ Error in document analysis: {e}")
+            return None
+    
+    def _parse_document_analysis_response(self, response, search_result: Dict) -> Dict:
+        """
+        Parse the GPT response for document analysis.
+        
+        Args:
+            response: GPT response object
+            search_result: Original search result
+            
+        Returns:
+            Dictionary with parsed analysis results
+        """
+        try:
+            # Handle both GPT-5 and GPT-4o responses
+            if hasattr(response, 'output_text'):
+                content = response.output_text  # GPT-5 format
+            elif hasattr(response, 'choices') and len(response.choices) > 0:
+                content = response.choices[0].message.content  # GPT-4o format
+            else:
+                print("❌ Unknown response format")
+                return self._create_default_document_info(search_result)
+            
+            # Try to extract JSON from the response
+            if '{' in content and '}' in content:
+                start_idx = content.find('{')
+                end_idx = content.rfind('}') + 1
+                if start_idx != -1 and end_idx != -1:
+                    json_str = content[start_idx:end_idx]
+                    try:
+                        result = json.loads(json_str)
+                        # Add the original search result info
+                        result['original_search_result'] = search_result
+                        return result
+                    except json.JSONDecodeError as e:
+                        print(f"❌ JSON decode error in document analysis: {e}")
+            
+            # Fallback to default document info
+            return self._create_default_document_info(search_result)
+            
+        except Exception as e:
+            print(f"❌ Error parsing document analysis response: {e}")
+            return self._create_default_document_info(search_result)
+    
+    def _create_default_document_info(self, search_result: Dict) -> Dict:
+        """
+        Create default document information when analysis fails.
+        
+        Args:
+            search_result: Original search result
+            
+        Returns:
+            Dictionary with default document information
+        """
+        return {
+            'title': search_result.get('title', 'Unknown'),
+            'url': search_result.get('url', ''),
+            'source': search_result.get('source', 'Unknown'),
+            'document_type': 'policy_document',
+            'requirements': ['Standard medical necessity criteria apply'],
+            'evidence_basis': 'Based on clinical studies and medical literature',
+            'clinical_criteria': ['Appropriate clinical indication'],
+            'coverage_status': 'Covered with prior authorization',
+            'cpt_codes': [],
+            'documentation_needed': ['Clinical documentation'],
+            'limitations': ['Standard policy limitations apply'],
+            'effective_date': 'N/A',
+            'revision_date': 'N/A',
+            'original_search_result': search_result
+        }
 
 # Global instance
 enhanced_insurance_analyzer = EnhancedInsuranceAnalysis()
+
+def run_automation_workflow(auth_id: str, auth_data: dict, background_tasks: dict, automation_details: dict, db) -> dict:
+    """
+    Run the complete automation workflow for prior authorization.
+    
+    Args:
+        auth_id: The authorization ID
+        auth_data: The authorization data
+        background_tasks: Dictionary to store background task status
+        automation_details: Dictionary to store detailed automation results
+        db: Database interface
+    
+    Returns:
+        dict: Result of the automation workflow
+    """
+    try:
+        # Extract basic information
+        cpt_code = auth_data.get('cpt_code', '81455')
+        insurance_provider = auth_data.get('insurance_provider', 'Original Medicare')
+        service_type = 'genetic testing'
+        
+        # Get patient context
+        patient_mrn = auth_data.get('patient_mrn', '')
+        patient_context = _build_patient_context(patient_mrn, auth_data)
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 10
+        background_tasks[auth_id]['message'] = 'Determining MAC jurisdiction...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Determine MAC jurisdiction
+        mac_jurisdiction = None
+        if any(medicare_term in insurance_provider.lower() 
+               for medicare_term in ['medicare', 'original medicare', 'cms']):
+            patient_state = patient_context.get('patient_state', 'CT')
+            mac_jurisdiction = enhanced_insurance_analyzer.get_mac_jurisdiction(patient_state)
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 20
+        background_tasks[auth_id]['message'] = 'Generating search queries...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Generate search queries
+        search_queries = enhanced_insurance_analyzer._generate_medicare_search_queries(
+            cpt_code, insurance_provider, service_type, mac_jurisdiction
+        )
+        
+        # Take top 5 queries to avoid timeouts
+        important_queries = search_queries[:5]
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 30
+        background_tasks[auth_id]['message'] = f'Running {len(important_queries)} searches...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Run searches
+        all_search_results = []
+        for i, query in enumerate(important_queries):
+            try:
+                background_tasks[auth_id]['message'] = f'Searching: {query[:50]}...'
+                background_tasks[auth_id]['last_update'] = datetime.now()
+                
+                # Update current activity
+                automation_details[auth_id]['current_activity'] = f'Searching: {query}'
+                
+                search_results = asyncio.run(enhanced_insurance_analyzer._gpt_search(None, query))
+                if search_results:
+                    all_search_results.extend(search_results)
+                    
+                    # Store search results with query context
+                    automation_details[auth_id]['search_results'].append({
+                        'query': query,
+                        'results': search_results,
+                        'timestamp': datetime.now().isoformat()
+                    })
+                    
+                    # Add citations
+                    for result in search_results:
+                        if result.get('url') and result.get('title'):
+                            automation_details[auth_id]['citations'].append({
+                                'source': result.get('source', 'Unknown'),
+                                'url': result.get('url'),
+                                'title': result.get('title'),
+                                'relevance': result.get('relevance', 0),
+                                'type': 'search_result'
+                            })
+                
+                background_tasks[auth_id]['progress'] = 30 + (i * 10)
+                background_tasks[auth_id]['last_update'] = datetime.now()
+                
+            except Exception as e:
+                print(f"Error in search query '{query}': {e}")
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 70
+        background_tasks[auth_id]['message'] = 'Processing search results...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Process and deduplicate results
+        unique_results = enhanced_insurance_analyzer._deduplicate_search_results(all_search_results)
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 75
+        background_tasks[auth_id]['message'] = 'Extracting policy documents...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Extract policy documents
+        automation_details[auth_id]['current_activity'] = 'Extracting policy documents from search results'
+        policy_documents = asyncio.run(enhanced_insurance_analyzer._extract_policy_documents(unique_results[:10]))
+        automation_details[auth_id]['extracted_documents'] = policy_documents
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 80
+        background_tasks[auth_id]['message'] = 'Running parsing agent analysis...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Run parsing agent analysis
+        automation_details[auth_id]['current_activity'] = 'Running parsing agent analysis'
+        parsing_agent_result = asyncio.run(enhanced_insurance_analyzer._analyze_documents_with_parsing_agent(
+            unique_results[:10], patient_context, cpt_code, insurance_provider
+        ))
+        
+        # Store parsing agent results
+        automation_details[auth_id]['parsing_agent_results'] = parsing_agent_result
+        
+        # Update progress
+        background_tasks[auth_id]['progress'] = 90
+        background_tasks[auth_id]['message'] = 'Analyzing coverage and requirements...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Analyze coverage and requirements
+        coverage_info = asyncio.run(enhanced_insurance_analyzer._analyze_coverage_and_requirements_with_gpt(
+            cpt_code, insurance_provider, policy_documents, patient_context, mac_jurisdiction
+        ))
+        
+        # Check patient criteria
+        patient_criteria_match = {}
+        if patient_context:
+            patient_criteria_match = asyncio.run(enhanced_insurance_analyzer._check_patient_criteria_with_gpt(
+                coverage_info.requirements, patient_context
+            ))
+        
+        # Generate recommendations
+        recommendations = asyncio.run(enhanced_insurance_analyzer._generate_recommendations_with_gpt(
+            coverage_info, patient_criteria_match, patient_context
+        ))
+        
+        # Create final result
+        final_result = {
+            'cpt_code': cpt_code,
+            'insurance_provider': insurance_provider,
+            'coverage_status': coverage_info.coverage_status,
+            'coverage_details': coverage_info.coverage_details,
+            'requirements': [
+                {
+                    'requirement_type': req.requirement_type,
+                    'description': req.description,
+                    'evidence_basis': req.evidence_basis,
+                    'documentation_needed': req.documentation_needed,
+                    'clinical_criteria': req.clinical_criteria,
+                    'source_document': req.source_document,
+                    'confidence_score': req.confidence_score
+                }
+                for req in coverage_info.requirements
+            ],
+            'patient_criteria_match': patient_criteria_match,
+            'confidence_score': coverage_info.confidence_score,
+            'search_sources': unique_results[:10],
+            'recommendations': recommendations,
+            'mac_jurisdiction': mac_jurisdiction["name"] if mac_jurisdiction else None,
+            'ncd_applicable': coverage_info.ncd_applicable if hasattr(coverage_info, 'ncd_applicable') else False,
+            'lcd_applicable': coverage_info.lcd_applicable if hasattr(coverage_info, 'lcd_applicable') else False,
+            'parsing_agent_result': parsing_agent_result
+        }
+        
+        # Check if automation should pause for clinician input
+        workflow_result = _check_automation_continuation(
+            auth_id, parsing_agent_result, automation_details, background_tasks, db
+        )
+        
+        if workflow_result['should_pause']:
+            return workflow_result
+        
+        # Continue with form completion
+        return _continue_with_form_completion(auth_id, auth_data, automation_details, background_tasks, db)
+        
+    except Exception as e:
+        print(f"Error in automation workflow: {e}")
+        return {'error': str(e)}
+
+def _build_patient_context(patient_mrn: str, auth_data: dict) -> dict:
+    """
+    Build patient context from EHR data.
+    """
+    patient_context = {}
+    
+    if patient_mrn:
+        try:
+            # Import the EHR system
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from backend.mock_ehr_system import MockEHRSystem
+            ehr_system = MockEHRSystem()
+            ehr_data = ehr_system.get_patient_data(patient_mrn)
+            
+            # Check for genetic counseling documentation
+            has_genetic_counseling = False
+            if 'genetics_counseling_and_consent' in ehr_data:
+                counseling_data = ehr_data['genetics_counseling_and_consent']
+                has_genetic_counseling = (
+                    counseling_data.get('genetic_counselor') and 
+                    counseling_data.get('counseling_date') and
+                    counseling_data.get('risk_assessment_completed', False)
+                )
+            
+            # Check for family history documentation
+            has_family_history = False
+            if 'family_history' in ehr_data and ehr_data['family_history']:
+                has_family_history = len(ehr_data['family_history']) > 0
+            
+            # Check for clinical indication documentation
+            has_clinical_indication = False
+            if 'clinical_notes' in ehr_data and ehr_data['clinical_notes']:
+                clinical_notes = ehr_data['clinical_notes']
+                has_clinical_indication = any(
+                    'medical necessity' in note.get('content', '').lower() or
+                    'clinical indication' in note.get('content', '').lower()
+                    for note in clinical_notes
+                )
+            
+            patient_context = {
+                'has_genetic_counseling': has_genetic_counseling,
+                'has_family_history': has_family_history,
+                'has_clinical_indication': has_clinical_indication,
+                'provider_credentials_valid': True,
+                'patient_state': auth_data.get('patient_state', 'CT')
+            }
+            
+            print(f"🔍 Patient context for {patient_mrn}:")
+            print(f"  - Has genetic counseling: {has_genetic_counseling}")
+            print(f"  - Has family history: {has_family_history}")
+            print(f"  - Has clinical indication: {has_clinical_indication}")
+            
+        except Exception as e:
+            print(f"Error getting EHR data: {e}")
+            patient_context = {
+                'has_genetic_counseling': False,
+                'has_family_history': False,
+                'has_clinical_indication': True,
+                'provider_credentials_valid': True,
+                'patient_state': auth_data.get('patient_state', 'CT')
+            }
+    
+    return patient_context
+
+def _check_automation_continuation(auth_id: str, parsing_agent_result: dict, automation_details: dict, background_tasks: dict, db) -> dict:
+    """
+    Check if automation should continue or pause for clinician input.
+    """
+    print(f"🔍 Parsing agent result: {parsing_agent_result}")
+    print(f"🔍 Request validation: {parsing_agent_result.get('request_validation', {})}")
+    print(f"🔍 Is valid: {parsing_agent_result.get('request_validation', {}).get('is_valid', True)}")
+    
+    # Check the condition more explicitly
+    has_parsing_result = bool(parsing_agent_result)
+    is_valid = parsing_agent_result.get('request_validation', {}).get('is_valid', True)
+    should_pause = has_parsing_result and not is_valid
+    
+    print(f"🔍 Condition check:")
+    print(f"  - Has parsing result: {has_parsing_result}")
+    print(f"  - Is valid: {is_valid}")
+    print(f"  - Should pause: {should_pause}")
+    print(f"  - Parsing agent result type: {type(parsing_agent_result)}")
+    print(f"  - Parsing agent result keys: {list(parsing_agent_result.keys()) if isinstance(parsing_agent_result, dict) else 'Not a dict'}")
+    print(f"  - Request validation type: {type(parsing_agent_result.get('request_validation', {}))}")
+    print(f"  - Is valid type: {type(is_valid)}")
+    print(f"  - Is valid value: {repr(is_valid)}")
+    
+    if should_pause:
+        print(f"🛑 PAUSING AUTOMATION - Request is invalid")
+        # Request is invalid - use parsing agent's clinician message
+        clinician_message = parsing_agent_result.get('clinician_message', '')
+        missing_documents = parsing_agent_result.get('request_validation', {}).get('missing_documents', [])
+        
+        print(f"🔍 Clinician message: {clinician_message[:100]}...")
+        print(f"🔍 Missing documents: {missing_documents}")
+        
+        # Store the message and missing requirements
+        automation_details[auth_id]['clinician_message'] = clinician_message
+        automation_details[auth_id]['missing_requirements'] = missing_documents
+        automation_details[auth_id]['needs_clinician_input'] = True
+        automation_details[auth_id]['parsing_agent_results'] = parsing_agent_result
+        
+        # Update status to indicate waiting for clinician input
+        background_tasks[auth_id]['progress'] = 50
+        background_tasks[auth_id]['message'] = 'Waiting for clinician input - requirements not met'
+        background_tasks[auth_id]['is_running'] = False
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Update database status to 'review' (will be changed to 'deferred' when message is sent)
+        db.update_prior_auth_status(auth_id, 'review')
+        print(f"🛑 AUTOMATION PAUSED - Waiting for clinician input")
+        
+        return {
+            'should_pause': True,
+            'clinician_message': clinician_message,
+            'missing_documents': missing_documents
+        }
+    
+    print(f"✅ CONTINUING AUTOMATION - Request is valid")
+    return {'should_pause': False}
+
+def _continue_with_form_completion(auth_id: str, auth_data: dict, automation_details: dict, background_tasks: dict, db) -> dict:
+    """
+    Continue automation with form completion.
+    """
+    # Step 2: Form Completion (only if requirements are met)
+    background_tasks[auth_id]['current_step'] = 2
+    background_tasks[auth_id]['message'] = 'Coverage analysis complete. Starting form completion...'
+    background_tasks[auth_id]['progress'] = 50
+    background_tasks[auth_id]['last_update'] = datetime.now()
+    
+    # Final check - don't complete if there are missing requirements
+    if automation_details[auth_id].get('needs_clinician_input', False):
+        print(f"🛑 PREVENTING COMPLETION - Clinician input still needed")
+        background_tasks[auth_id]['progress'] = 50
+        background_tasks[auth_id]['message'] = 'Waiting for clinician input - requirements not met'
+        background_tasks[auth_id]['is_running'] = False
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        return {'should_pause': True}
+    
+    # Simulate form completion
+    form_result = {
+        'status': 'completed',
+        'form_data': automation_details[auth_id].get('form_data', {}),
+        'message': 'Form completion simulated successfully'
+    }
+    
+    # Store results and mark as complete
+    background_tasks[auth_id]['results']['form'] = form_result
+    background_tasks[auth_id]['current_step'] = 3
+    background_tasks[auth_id]['message'] = 'Automation complete!'
+    background_tasks[auth_id]['progress'] = 100
+    background_tasks[auth_id]['is_running'] = False
+    background_tasks[auth_id]['last_update'] = datetime.now()
+    
+    # Update database status
+    db.update_prior_auth_status(auth_id, 'completed')
+    
+    return {'should_pause': False, 'form_result': form_result}

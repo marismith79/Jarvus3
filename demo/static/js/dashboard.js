@@ -1,5 +1,4 @@
 // Dashboard JavaScript for Prior Authorization Management
-// Extracted from dashboard.html
 
 let currentTab = 'all';
 let allPriorAuths = [];
@@ -11,6 +10,7 @@ let currentAutomationStep = 1;
 let automationData = {};
 let streamingInterval = null;
 let stepResults = {};
+let automationPollingInterval = null;
 
 // Step configurations
 const automationSteps = [
@@ -200,7 +200,7 @@ function createTableRow(auth) {
             <input type="checkbox" class="auth-checkbox" value="${auth.id}" onchange="updateBulkActions()" onclick="event.stopPropagation()">
         </td>
         <td class="patient-col">
-            <div class="patient-name">${auth.patient_name}</div>
+                <div class="patient-name">${auth.patient_name}</div>
         </td>
         <td class="created-col">
             <div class="created-date">${formatDate(auth.created_date)}</div>
@@ -209,7 +209,7 @@ function createTableRow(auth) {
             <span class="priority-badge priority-${auth.clinical_urgency || 'routine'}">${getPriorityDisplay(auth.clinical_urgency)}</span>
         </td>
         <td class="type-col">
-            <div class="service-type">${auth.service_type}</div>
+                <div class="service-type">${auth.service_type}</div>
         </td>
         <td class="status-col">
             <span class="status-badge status-${auth.status}">${getStatusDisplay(auth.status)}</span>
@@ -221,7 +221,7 @@ function createTableRow(auth) {
             <div class="ref-department">${auth.ordering_department || 'ONCOLOGY'}</div>
         </td>
         <td class="insurance-col">
-            <div class="insurance-provider">${auth.insurance_provider}</div>
+                <div class="insurance-provider">${auth.insurance_provider}</div>
         </td>
         <td class="cpt-col">
             <span class="cpt-code">${auth.cpt_code || 'N/A'}</span>
@@ -291,7 +291,10 @@ function getCommOutcome(status) {
 function updateLastRefreshedTime() {
     const now = new Date();
     const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
-    document.getElementById('last-refreshed-time').textContent = timeString;
+    const lastRefreshedElement = document.getElementById('last-refreshed-time');
+    if (lastRefreshedElement) {
+        lastRefreshedElement.textContent = timeString;
+    }
 }
 
 function getActionButton(auth) {
@@ -300,8 +303,8 @@ function getActionButton(auth) {
                     <i class="fas fa-robot"></i>
                 </button>`;
     } else if (auth.status === 'running') {
-        return `<button class="btn btn-sm btn-warning" onclick="pauseAutomation(${auth.id})" title="Pause Automation">
-                    <i class="fas fa-pause"></i>
+        return `<button class="btn btn-sm btn-info" onclick="viewDetails(${auth.id})" title="View Progress">
+                    <i class="fas fa-eye"></i>
                 </button>`;
     } else if (auth.status === 'review') {
         return `<button class="btn btn-sm btn-success" onclick="approveAuth(${auth.id})" title="Approve">
@@ -535,11 +538,526 @@ async function runAutomationWorkflow(authId) {
     currentAutomationStep = 1;
     stepResults = {};
     
-    // Show automation popup
-    document.getElementById('automation-popup').style.display = 'block';
+    // Start automation on backend
+    try {
+        const response = await fetch(`/api/prior-auths/${authId}/start-automation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Update button states to show running state
+            const actionBtn = document.getElementById('modal-action-btn');
+            const cancelBtn = document.getElementById('modal-cancel-btn');
+            
+            actionBtn.textContent = 'View Progress';
+            actionBtn.className = 'btn btn-info';
+            actionBtn.onclick = () => {
+                // Switch to automation tab and show progress
+                switchModalTab('automation');
+                showAutomationProgress(authId);
+            };
+            
+            cancelBtn.style.display = 'inline-block';
+            
+            // Start polling for updates
+            startAutomationPolling(authId);
+        } else {
+            console.error('Failed to start automation:', result.error);
+            alert('Failed to start automation: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error starting automation:', error);
+        alert('Error starting automation: ' + error.message);
+    }
+}
+
+function startAutomationPolling(authId) {
+    // Clear any existing polling
+    if (automationPollingInterval) {
+        clearInterval(automationPollingInterval);
+    }
     
-    // Start the workflow
-    await executeAutomationStep(currentAutomationStep);
+    // Start polling every 2 seconds
+    automationPollingInterval = setInterval(async () => {
+        await pollAutomationStatus(authId);
+    }, 2000);
+    
+    // Do initial poll immediately
+    pollAutomationStatus(authId);
+}
+
+async function pollAutomationStatus(authId) {
+    try {
+        const response = await fetch(`/api/automation/status/${authId}`);
+        const status = await response.json();
+        
+        if (status.error) {
+            console.error('Automation error:', status.error);
+            stopAutomationPolling();
+            return;
+        }
+        
+        // Update UI with current status
+        updateAutomationUI(status);
+        
+        // Check if automation is complete
+        if (!status.is_running) {
+            stopAutomationPolling();
+            
+            if (status.error) {
+                console.error('Automation failed:', status.error);
+                alert('Automation failed: ' + status.error);
+            } else {
+                console.log('Automation completed successfully');
+                // Update the current step status to show completion
+                const currentStepStatus = document.getElementById('current-step-status');
+                if (currentStepStatus) {
+                    currentStepStatus.innerHTML = '<i class="fas fa-check"></i> Complete';
+                }
+                
+                // Remove the spinning gear from current activity
+                const currentActivity = document.querySelector('.current-activity');
+                if (currentActivity) {
+                    const activityIcon = currentActivity.querySelector('i');
+                    if (activityIcon) {
+                        activityIcon.className = 'fas fa-check-circle';
+                        activityIcon.style.animation = 'none';
+                    }
+                }
+                
+                // Add completion message to the detailed content
+                const contentContainer = document.getElementById('step-content-container');
+                if (contentContainer) {
+                    const completionMessage = document.createElement('div');
+                    completionMessage.className = 'completion-message';
+                    completionMessage.innerHTML = `
+                        <div class="completion-banner">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Automation completed successfully!</span>
+                        </div>
+                    `;
+                    contentContainer.insertBefore(completionMessage, contentContainer.firstChild);
+                }
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error polling automation status:', error);
+    }
+}
+
+function stopAutomationPolling() {
+    if (automationPollingInterval) {
+        clearInterval(automationPollingInterval);
+        automationPollingInterval = null;
+    }
+}
+
+function updateAutomationUI(status) {
+    // Update progress bar
+    const progressFill = document.getElementById('automation-progress-fill');
+    const progressText = document.getElementById('automation-progress-text');
+    
+    if (progressFill && progressText) {
+        progressFill.style.width = `${status.progress}%`;
+        progressText.textContent = `${Math.round(status.progress)}% Complete`;
+    }
+    
+    // Update current step display
+    const currentStepTitle = document.getElementById('current-step-title');
+    const currentStepDescription = document.getElementById('current-step-description');
+    const currentStepStatus = document.getElementById('current-step-status');
+    
+    if (currentStepTitle && currentStepDescription && currentStepStatus) {
+        const step = automationSteps[status.current_step - 1];
+        if (step) {
+            currentStepTitle.textContent = step.title;
+            currentStepDescription.textContent = status.message;
+            
+            if (status.is_running) {
+                currentStepStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running';
+            } else {
+                currentStepStatus.innerHTML = '<i class="fas fa-check"></i> Complete';
+            }
+        }
+    }
+    
+    // Update step history
+    updateStepHistory(status);
+    
+    // Update detailed content area
+    updateDetailedContent(status);
+}
+
+function updateStepHistory(status) {
+    const stepHistoryContainer = document.getElementById('step-history-container');
+    if (!stepHistoryContainer) return;
+    
+    // Clear existing history
+    stepHistoryContainer.innerHTML = '';
+    
+    // Add completed steps
+    for (let i = 1; i < status.current_step; i++) {
+        const step = automationSteps[i - 1];
+        if (step) {
+            const stepElement = document.createElement('div');
+            stepElement.className = 'completed-step';
+            stepElement.innerHTML = `
+                <div class="step-icon">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div class="step-info">
+                    <h4>${step.title}</h4>
+                    <p>Completed successfully</p>
+                </div>
+            `;
+            stepHistoryContainer.appendChild(stepElement);
+        }
+    }
+}
+
+function updateDetailedContent(status) {
+    const contentContainer = document.getElementById('step-content-container');
+    if (!contentContainer || !status.details) return;
+    
+    const details = status.details;
+    let contentHtml = '';
+    
+    // Show current activity
+    if (details.current_activity) {
+        const isRunning = status.is_running !== false; // Default to true if not explicitly false
+        const iconClass = isRunning ? 'fas fa-cog fa-spin' : 'fas fa-check-circle';
+        const title = isRunning ? 'Current Activity' : 'Last Activity';
+        
+        contentHtml += `
+            <div class="current-activity">
+                <h5><i class="${iconClass}"></i> ${title}</h5>
+                <p>${details.current_activity}</p>
+            </div>
+        `;
+    }
+    
+    // Track which sections to show expanded (current step) vs collapsed (previous steps)
+    const currentStep = status.current_step || 1;
+    let sectionCount = 0;
+    
+    // Show search results
+    if (details.search_results && details.search_results.length > 0) {
+        sectionCount++;
+        const isCurrentStep = currentStep === 1;
+        const isExpanded = isCurrentStep || status.is_running === false;
+        
+        contentHtml += `
+            <div class="collapsible-section ${isExpanded ? 'expanded' : 'collapsed'}" data-section="search-results">
+                <div class="section-header" onclick="toggleSection('search-results')">
+                    <h5><i class="fas fa-search"></i> Policy Research Results</h5>
+                    <div class="section-status">
+                        <span class="status-badge ${isCurrentStep ? 'current' : 'completed'}">
+                            ${isCurrentStep ? 'In Progress' : 'Completed'}
+                        </span>
+                        <i class="fas fa-chevron-${isExpanded ? 'up' : 'down'}"></i>
+                    </div>
+                </div>
+                <div class="section-content" style="display: ${isExpanded ? 'block' : 'none'};">
+                    <div class="search-results-list">
+        `;
+        
+        details.search_results.forEach(searchGroup => {
+            contentHtml += `
+                <div class="search-group">
+                    <h6>Query: "${searchGroup.query}"</h6>
+                    <div class="results-grid">
+            `;
+            
+            searchGroup.results.forEach(result => {
+                contentHtml += `
+                    <div class="result-item">
+                        <div class="result-header">
+                            <a href="${result.url}" target="_blank" class="result-title">${result.title}</a>
+                            <span class="result-relevance">${result.relevance || 0}%</span>
+                        </div>
+                        <div class="result-snippet">${result.snippet || 'No snippet available'}</div>
+                        <div class="result-meta">
+                            <span class="result-source">${result.source || 'Unknown'}</span>
+                            <span class="result-type">${result.type || 'document'}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            contentHtml += `
+                    </div>
+                </div>
+            `;
+        });
+        
+        contentHtml += `
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Show parsing agent results
+    if (details.parsing_agent_results) {
+        sectionCount++;
+        const isCurrentStep = currentStep === 1; // Parsing agent runs as part of step 1
+        const isExpanded = isCurrentStep || status.is_running === false;
+        
+        contentHtml += `
+            <div class="collapsible-section ${isExpanded ? 'expanded' : 'collapsed'}" data-section="parsing-agent">
+                <div class="section-header" onclick="toggleSection('parsing-agent')">
+                    <h5><i class="fas fa-file-alt"></i> Document Analysis</h5>
+                    <div class="section-status">
+                        <span class="status-badge ${isCurrentStep ? 'current' : 'completed'}">
+                            ${isCurrentStep ? 'In Progress' : 'Completed'}
+                        </span>
+                        <i class="fas fa-chevron-${isExpanded ? 'up' : 'down'}"></i>
+                    </div>
+                </div>
+                <div class="section-content" style="display: ${isExpanded ? 'block' : 'none'};">
+                    <div class="parsing-results">
+        `;
+        
+        const parsing = details.parsing_agent_results;
+        if (parsing.request_validation) {
+            contentHtml += `
+                <div class="validation-section">
+                    <h6>Request Validation</h6>
+                    <div class="validation-status ${parsing.request_validation.is_valid ? 'valid' : 'invalid'}">
+                        <i class="fas fa-${parsing.request_validation.is_valid ? 'check-circle' : 'exclamation-triangle'}"></i>
+                        <span>${parsing.request_validation.is_valid ? 'Valid Request' : 'Invalid Request'}</span>
+                    </div>
+                    <p>${parsing.request_validation.validation_notes}</p>
+                </div>
+            `;
+        }
+        
+        if (parsing.critical_requirements) {
+            contentHtml += `
+                <div class="requirements-section">
+                    <h6>Coverage Requirements</h6>
+                    <div class="requirements-list">
+            `;
+            
+            parsing.critical_requirements.forEach(req => {
+                contentHtml += `
+                    <div class="requirement-item">
+                        <div class="requirement-header">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span><strong>${req.requirement}</strong></span>
+                        </div>
+                        <div class="requirement-details">
+                            <p><strong>Criteria:</strong> ${req.criteria}</p>
+                            <p><strong>Documentation:</strong> ${req.documentation_needed}</p>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            contentHtml += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        contentHtml += `
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Show form data
+    if (details.form_data && Object.keys(details.form_data).length > 0) {
+        sectionCount++;
+        const isCurrentStep = currentStep === 2;
+        const isExpanded = isCurrentStep || status.is_running === false;
+        
+        contentHtml += `
+            <div class="collapsible-section ${isExpanded ? 'expanded' : 'collapsed'}" data-section="form-data">
+                <div class="section-header" onclick="toggleSection('form-data')">
+                    <h5><i class="fas fa-file-medical"></i> Form Completion</h5>
+                    <div class="section-status">
+                        <span class="status-badge ${isCurrentStep ? 'current' : 'completed'}">
+                            ${isCurrentStep ? 'In Progress' : 'Completed'}
+                        </span>
+                        <i class="fas fa-chevron-${isExpanded ? 'up' : 'down'}"></i>
+                    </div>
+                </div>
+                <div class="section-content" style="display: ${isExpanded ? 'block' : 'none'};">
+                    <div class="form-data-grid">
+        `;
+        
+        if (details.form_data.patient_info) {
+            contentHtml += `
+                <div class="form-section">
+                    <h6>Patient Information</h6>
+                    <div class="form-field">
+                        <label>Name:</label>
+                        <span>${details.form_data.patient_info.name}</span>
+                        <small class="citation">Source: ${details.form_data.patient_info.source}</small>
+                    </div>
+                    <div class="form-field">
+                        <label>MRN:</label>
+                        <span>${details.form_data.patient_info.mrn}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (details.form_data.service_info) {
+            contentHtml += `
+                <div class="form-section">
+                    <h6>Service Information</h6>
+                    <div class="form-field">
+                        <label>Service Type:</label>
+                        <span>${details.form_data.service_info.service_type}</span>
+                        <small class="citation">Source: ${details.form_data.service_info.source}</small>
+                    </div>
+                    <div class="form-field">
+                        <label>CPT Code:</label>
+                        <span>${details.form_data.service_info.cpt_code}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (details.form_data.validation) {
+            contentHtml += `
+                <div class="form-section">
+                    <h6>Validation</h6>
+                    <div class="validation-status ${details.form_data.validation.status}">
+                        <i class="fas fa-${details.form_data.validation.status === 'valid' ? 'check-circle' : 'exclamation-triangle'}"></i>
+                        <span>${details.form_data.validation.status.toUpperCase()}</span>
+                    </div>
+                    ${details.form_data.validation.errors.length > 0 ? `
+                        <div class="validation-errors">
+                            <h6>Errors:</h6>
+                            <ul>
+                                ${details.form_data.validation.errors.map(error => `<li>${error}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+        
+        contentHtml += `
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Show citations
+    if (details.citations && details.citations.length > 0) {
+        sectionCount++;
+        const isCurrentStep = false; // Citations are always available
+        const isExpanded = false; // Always collapsed by default
+        
+        contentHtml += `
+            <div class="collapsible-section collapsed" data-section="citations">
+                <div class="section-header" onclick="toggleSection('citations')">
+                    <h5><i class="fas fa-link"></i> Data Sources</h5>
+                    <div class="section-status">
+                        <span class="status-badge completed">Available</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="section-content" style="display: none;">
+                    <div class="citations-list">
+        `;
+        
+        details.citations.forEach(citation => {
+            contentHtml += `
+                <div class="citation-item">
+                    <div class="citation-header">
+                        <a href="${citation.url}" target="_blank" class="citation-title">${citation.title}</a>
+                        <span class="citation-relevance">${citation.relevance}%</span>
+                    </div>
+                    <div class="citation-meta">
+                        <span class="citation-source">${citation.source}</span>
+                        <span class="citation-type">${citation.type}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        contentHtml += `
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Update content
+    contentContainer.innerHTML = contentHtml;
+}
+
+function toggleSection(sectionName) {
+    const section = document.querySelector(`[data-section="${sectionName}"]`);
+    if (!section) return;
+    
+    const content = section.querySelector('.section-content');
+    const chevron = section.querySelector('.fa-chevron-up, .fa-chevron-down');
+    const isExpanded = section.classList.contains('expanded');
+    
+    if (isExpanded) {
+        // Collapse
+        section.classList.remove('expanded');
+        section.classList.add('collapsed');
+        content.style.display = 'none';
+        chevron.className = 'fas fa-chevron-down';
+    } else {
+        // Expand
+        section.classList.remove('collapsed');
+        section.classList.add('expanded');
+        content.style.display = 'block';
+        chevron.className = 'fas fa-chevron-up';
+    }
+}
+
+function showAutomationResults(results) {
+    const content = document.getElementById('step-content-container');
+    if (!content) return;
+    
+    // Display results based on what's available
+    let resultsHtml = '<div class="automation-results">';
+    resultsHtml += '<h4><i class="fas fa-check-circle"></i> Automation Complete</h4>';
+    
+    if (results.coverage) {
+        resultsHtml += '<div class="result-section">';
+        resultsHtml += '<h5>Coverage Analysis Results</h5>';
+        resultsHtml += `<p><strong>Coverage Status:</strong> ${results.coverage.coverage_status}</p>`;
+        resultsHtml += `<p><strong>Confidence Score:</strong> ${results.coverage.confidence_score}%</p>`;
+        
+        if (results.coverage.parsing_agent_result) {
+            resultsHtml += '<div class="parsing-agent-results">';
+            resultsHtml += '<h6>Parsing Agent Analysis</h6>';
+            resultsHtml += `<p><strong>Request Validation:</strong> ${results.coverage.parsing_agent_result.request_validation.is_valid ? 'Valid' : 'Invalid'}</p>`;
+            resultsHtml += '</div>';
+        }
+        
+        resultsHtml += '</div>';
+    }
+    
+    if (results.form) {
+        resultsHtml += '<div class="result-section">';
+        resultsHtml += '<h5>Form Completion Results</h5>';
+        resultsHtml += `<p><strong>Status:</strong> ${results.form.form_data.status}</p>`;
+        resultsHtml += `<p><strong>Submission Ready:</strong> ${results.form.submission_ready ? 'Yes' : 'No'}</p>`;
+        resultsHtml += '</div>';
+    }
+    
+    resultsHtml += '</div>';
+    
+    content.innerHTML = resultsHtml;
 }
 
 async function executeAutomationStep(stepNumber) {
@@ -581,6 +1099,8 @@ function updateStepDisplay(step) {
     document.getElementById('automation-progress-fill').style.width = `${progress}%`;
     document.getElementById('automation-progress-text').textContent = `${Math.round(progress)}% Complete`;
 }
+
+
 
 async function executePolicyResearchAndCoverage() {
     const content = document.getElementById('step-content-container');
@@ -791,6 +1311,8 @@ async function executePolicyResearchAndCoverage() {
                                                             </button>
                                                         </div>
                                                     </div>
+                                                    
+
                                                     ` : ''}
                                                 </div>
                                                 
@@ -867,6 +1389,15 @@ async function executePolicyResearchAndCoverage() {
                                 
                                 // Store the result for later use
                                 window.currentAnalysisResult = result;
+                                
+                                // Auto-show clinician message modal if request is invalid
+                                if (result.parsing_agent_result && !result.parsing_agent_result.request_validation.is_valid) {
+                                    setTimeout(() => {
+                                        console.log('🔄 Auto-showing clinician message modal...');
+                                        sendClinicianMessage(result.parsing_agent_result.clinician_message);
+                                    }, 2000); // Wait 2 seconds for the results to be displayed
+                                }
+                                
                                 return;
                         }
                     } catch (parseError) {
@@ -1265,17 +1796,20 @@ async function executeFormCompletionWithEHR() {
                                                 <h5>Human Validation Required:</h5>
                                                 <p>Please review the completed form above. All data has been extracted from the EHR system and cross-referenced with policy requirements from Step 1.</p>
                                                 
-                                                <div class="validation-actions">
-                                                    <button class="btn btn-success" onclick="approveForm()">
-                                                        <i class="fas fa-check"></i> Approve & Submit
-                                                    </button>
-                                                    <button class="btn btn-warning" onclick="requestFormChanges()">
-                                                        <i class="fas fa-edit"></i> Request Changes
-                                                    </button>
-                                                    <button class="btn btn-info" onclick="exportForm()">
-                                                        <i class="fas fa-download"></i> Export Form
-                                                    </button>
-                                                </div>
+                                                                                            <div class="validation-actions">
+                                                <button class="btn btn-primary" onclick="openInteractiveForm()">
+                                                    <i class="fas fa-edit"></i> Interactive Form Editor
+                                                </button>
+                                                <button class="btn btn-success" onclick="approveForm()">
+                                                    <i class="fas fa-check"></i> Approve & Submit
+                                                </button>
+                                                <button class="btn btn-warning" onclick="requestFormChanges()">
+                                                    <i class="fas fa-edit"></i> Request Changes
+                                                </button>
+                                                <button class="btn btn-info" onclick="exportForm()">
+                                                    <i class="fas fa-download"></i> Export Form
+                                                </button>
+                                            </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1856,11 +2390,13 @@ async function streamText(container, html, stepType = 'default') {
 }
 
 function closeAutomationPopup() {
-    document.getElementById('automation-popup').style.display = 'none';
-    document.getElementById('automation-actions').style.display = 'none';
+    // This function is no longer needed since automation is now in tabs
+    // But keeping it for backward compatibility
     if (streamingInterval) {
         clearInterval(streamingInterval);
     }
+    // Stop polling when popup is closed
+    stopAutomationPolling();
 }
 
 function approveCurrentStep() {
@@ -1905,6 +2441,17 @@ function sendToClinician() {
 }
 
 function closeClinicianModal() {
+    // Remove event listeners
+    const subjectInput = document.getElementById('clinician-message-subject');
+    const bodyTextarea = document.getElementById('clinician-message-body');
+    
+    if (subjectInput) {
+        subjectInput.removeEventListener('input', previewClinicianMessage);
+    }
+    if (bodyTextarea) {
+        bodyTextarea.removeEventListener('input', previewClinicianMessage);
+    }
+    
     document.getElementById('clinician-message-modal').style.display = 'none';
 }
 
@@ -2314,6 +2861,13 @@ function exportForm() {
     link.click();
 }
 
+function openInteractiveForm() {
+    // Open the interactive form editor in a new window/tab
+    const authId = automationData.id;
+    const url = `/interactive-form?auth_id=${authId}`;
+    window.open(url, '_blank');
+}
+
 function submitForm() {
     console.log('Submitting form to insurance');
     
@@ -2484,43 +3038,194 @@ function showCaseDetails(auth) {
     
     // Update the action button based on status
     const actionBtn = document.getElementById('modal-action-btn');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
     
     if (auth.status === 'pending') {
-        actionBtn.textContent = '🤖 Start Automation';
+        actionBtn.textContent = 'Start Automation';
         actionBtn.className = 'btn btn-primary';
         actionBtn.onclick = () => {
-            closeModal();
-            startAutomation(auth.id);
+            // Switch to automation tab and start automation
+            switchModalTab('automation');
+            runAutomationWorkflow(auth.id);
         };
-    } else if (auth.status === 'running') {
-        actionBtn.textContent = '📊 View Progress';
-        actionBtn.className = 'btn btn-info';
-        actionBtn.onclick = () => {
-            closeModal();
-            viewAutomationProgress(auth.id);
-        };
+        cancelBtn.style.display = 'none';
+            } else if (auth.status === 'running') {
+            actionBtn.textContent = 'View Progress';
+            actionBtn.className = 'btn btn-info';
+            actionBtn.onclick = () => {
+                // Switch to automation tab and show progress
+                switchModalTab('automation');
+                showAutomationProgress(auth.id);
+            };
+            cancelBtn.style.display = 'inline-block';
     } else if (auth.status === 'completed') {
-        actionBtn.textContent = '📋 View Automation History';
+        actionBtn.textContent = 'View Automation History';
         actionBtn.className = 'btn btn-success';
         actionBtn.onclick = () => {
-            closeModal();
-            viewAutomationProgress(auth.id);
+            // Switch to automation tab and show history
+            switchModalTab('automation');
+            showAutomationHistory(auth.id);
         };
+        cancelBtn.style.display = 'none';
     } else if (auth.status === 'review' || auth.status === 'feedback') {
-        actionBtn.textContent = '📊 View Progress';
-        actionBtn.className = 'btn btn-warning';
+        actionBtn.textContent = 'View Progress';
+        actionBtn.className = 'btn btn-info';
         actionBtn.onclick = () => {
-            closeModal();
-            viewAutomationProgress(auth.id);
+            // Switch to automation tab and show progress
+            switchModalTab('automation');
+            showAutomationProgress(auth.id);
         };
+        cancelBtn.style.display = 'none';
     } else {
-        actionBtn.textContent = '📋 View Details';
+        actionBtn.textContent = 'View Details';
         actionBtn.className = 'btn btn-secondary';
         actionBtn.onclick = () => closeModal();
+        cancelBtn.style.display = 'none';
     }
     
     // Show the modal
     document.getElementById('auth-detail-modal').style.display = 'block';
+}
+
+function switchModalTab(tabName) {
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => content.classList.remove('active'));
+    
+    // Remove active class from all tabs
+    const tabs = document.querySelectorAll('.modal-tab');
+    tabs.forEach(tab => tab.classList.remove('active'));
+    
+    // Show selected tab content
+    const selectedTabContent = document.getElementById(`${tabName}-tab`);
+    if (selectedTabContent) {
+        selectedTabContent.classList.add('active');
+    }
+    
+    // Add active class to selected tab
+    const selectedTab = document.querySelector(`[data-tab="${tabName}"]`);
+    if (selectedTab) {
+        selectedTab.classList.add('active');
+    }
+}
+
+function showAutomationProgress(authId) {
+    // Switch to automation tab
+    switchModalTab('automation');
+    
+    // Start polling for updates
+    startAutomationPolling(authId);
+}
+
+function showAutomationHistory(authId) {
+    // Switch to automation tab
+    switchModalTab('automation');
+    
+    // Get final results and show detailed content
+    fetch(`/api/automation/status/${authId}`)
+        .then(response => response.json())
+        .then(status => {
+            if (status.details) {
+                // Show the detailed content (same as during automation)
+                updateDetailedContent(status);
+                
+                // Add completion message at the top
+                const contentContainer = document.getElementById('step-content-container');
+                if (contentContainer) {
+                    const completionMessage = document.createElement('div');
+                    completionMessage.className = 'completion-message';
+                    completionMessage.innerHTML = `
+                        <div class="completion-banner">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Automation completed successfully!</span>
+                        </div>
+                    `;
+                    contentContainer.insertBefore(completionMessage, contentContainer.firstChild);
+                }
+                
+                // Update step status to show completion
+                const currentStepStatus = document.getElementById('current-step-status');
+                if (currentStepStatus) {
+                    currentStepStatus.innerHTML = '<i class="fas fa-check"></i> Complete';
+                }
+            } else {
+                // Fallback to showing basic completion
+                const content = document.getElementById('step-content-container');
+                content.innerHTML = '<div class="automation-results"><h4><i class="fas fa-check-circle"></i> Automation Completed</h4><p>Results are no longer available.</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error getting automation history:', error);
+            const content = document.getElementById('step-content-container');
+            content.innerHTML = '<div class="automation-results"><h4><i class="fas fa-exclamation-triangle"></i> Error</h4><p>Could not load automation history.</p></div>';
+        });
+}
+
+function resetAllCases() {
+    if (confirm('Are you sure you want to reset all cases to pending status? This will clear all automation progress.')) {
+        fetch('/api/reset-all-cases', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert('All cases have been reset to pending status.');
+                // Reload the data to reflect changes
+                loadData();
+            } else {
+                alert('Error resetting cases: ' + result.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error resetting cases:', error);
+            alert('Error resetting cases: ' + error.message);
+        });
+    }
+}
+
+
+
+function cancelAutomation() {
+    const authId = automationData?.id;
+    if (!authId) {
+        alert('No automation to cancel.');
+        return;
+    }
+    
+    if (confirm('Are you sure you want to cancel the automation? This action cannot be undone.')) {
+        // Stop polling
+        stopAutomationPolling();
+        
+        // Clear background tasks (this would need a backend endpoint)
+        fetch(`/api/prior-auths/${authId}/cancel-automation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert('Automation has been cancelled.');
+                // Reload the data to reflect changes
+                loadData();
+                // Refresh the modal to show updated button states
+                const auth = allPriorAuths.find(a => a.id == authId);
+                if (auth) {
+                    showCaseDetails(auth);
+                }
+            } else {
+                alert('Error cancelling automation: ' + result.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error cancelling automation:', error);
+            alert('Error cancelling automation: ' + error.message);
+        });
+    }
 }
 
 function viewDetails(authId) {
@@ -2536,6 +3241,8 @@ function viewDetails(authId) {
 
 function closeModal() {
     document.getElementById('auth-detail-modal').style.display = 'none';
+    // Stop polling when modal is closed
+    stopAutomationPolling();
 }
 
 function closeStepModal() {
@@ -2600,30 +3307,7 @@ function viewStepDetails(authId) {
     document.getElementById('step-detail-modal').style.display = 'block';
 }
 
-function pauseAutomation(authId) {
-    if (confirm('Are you sure you want to pause the automation for this request?')) {
-        // Call backend to pause automation
-        fetch(`/api/prior-auths/${authId}/pause-automation`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Automation paused successfully');
-                loadData(); // Refresh the data
-            } else {
-                alert('Error pausing automation: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error pausing automation');
-        });
-    }
-}
+
 
 function approveAuth(authId) {
     if (confirm('Are you sure you want to approve this prior authorization request?')) {
@@ -3256,24 +3940,56 @@ function viewAutomationProgress(authId) {
 
 function sendClinicianMessage(message = null) {
     if (message) {
-        // If message is provided, populate the modal
-        document.getElementById('clinician-message-content').innerHTML = `
-            <div class="message-body">
-                <p><strong>Dear Clinician,</strong></p>
-                <p>${message}</p>
-                <p><strong>Please provide the requested documentation to proceed with the prior authorization request.</strong></p>
-                <p>Best regards,<br>Prior Authorization Team</p>
-            </div>
-        `;
+        // If message is provided, populate the modal with editable fields
+        document.getElementById('clinician-message-subject').value = 'Prior Authorization - Missing Information';
+        document.getElementById('clinician-message-body').value = message;
+        
+        // Update preview
+        previewClinicianMessage();
+        
+        // Add event listeners for real-time preview updates
+        const subjectInput = document.getElementById('clinician-message-subject');
+        const bodyTextarea = document.getElementById('clinician-message-body');
+        
+        subjectInput.addEventListener('input', previewClinicianMessage);
+        bodyTextarea.addEventListener('input', previewClinicianMessage);
+        
+        // Show the modal
         document.getElementById('clinician-message-modal').style.display = 'block';
     } else {
+        // Get the current message content
+        const subject = document.getElementById('clinician-message-subject').value;
+        const body = document.getElementById('clinician-message-body').value;
+        
+        if (!body.trim()) {
+            alert('Please enter a message before sending.');
+            return;
+        }
+        
         // Simulate sending message via EPIC
-        alert('Message sent to Dr. Johnson via EPIC messaging system.');
+        alert(`Message sent to Dr. Johnson via EPIC messaging system.\n\nSubject: ${subject}\n\nMessage: ${body}`);
         closeClinicianModal();
         
         // Continue automation
         approveCurrentStep();
     }
+}
+
+function previewClinicianMessage() {
+    const subject = document.getElementById('clinician-message-subject').value;
+    const body = document.getElementById('clinician-message-body').value;
+    
+    const preview = document.getElementById('clinician-message-preview');
+    preview.innerHTML = `
+        <div class="message-preview-content">
+            <div class="preview-header">
+                <strong>Subject:</strong> ${subject || 'No subject'}
+            </div>
+            <div class="preview-body">
+                ${body ? body.replace(/\n/g, '<br>') : 'No message content'}
+            </div>
+        </div>
+    `;
 }
 
 async function debugData() {

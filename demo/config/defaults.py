@@ -85,25 +85,28 @@ DEFAULT_PARSING_RESULT = {
     'critical_requirements': [
         {
             'requirement': 'Medical necessity documentation',
-            'criteria': 'Clinical indication must be documented',
-            'documentation_needed': 'Physician notes and clinical documentation',
-            'clinical_criteria': 'Appropriate clinical indication'
+            'criteria': 'Clinical indication must be documented with specific details from policy documents',
+            'documentation_needed': 'Physician notes, clinical documentation, and policy-specific requirements',
+            'clinical_criteria': 'Appropriate clinical indication as defined in policy documents'
         }
     ],
     'request_validation': {
-        'is_valid': True,
-        'missing_documents': [],
-        'validation_notes': 'Basic validation completed'
+        'is_valid': False,  # Default to invalid to ensure proper validation
+        'missing_documents': [
+            'Detailed medical necessity documentation',
+            'Policy-specific clinical criteria documentation'
+        ],
+        'validation_notes': 'Parsing agent unable to validate request - additional documentation required'
     },
-    'clinician_message': 'Request appears valid. Please ensure all clinical documentation is complete.',
+    'clinician_message': 'Dear Provider,\n\nOur analysis of your prior authorization request indicates that additional documentation is required to proceed. Please provide:\n\n1. Detailed medical necessity documentation with specific clinical criteria\n2. Policy-specific requirements documentation\n3. Any additional clinical evidence required by the insurance policy\n\nPlease submit these documents so we can complete the prior authorization process.\n\nThank you,\nPrior Authorization Team',
     'requirements_checklist': [
         {
             'category': 'Clinical Requirements',
             'items': [
                 {
                     'requirement': 'Medical necessity',
-                    'evidence_required': 'Clinical documentation',
-                    'notes': 'Must demonstrate appropriate clinical indication'
+                    'evidence_required': 'Detailed clinical documentation',
+                    'notes': 'Must demonstrate specific clinical indication as per policy'
                 }
             ]
         }

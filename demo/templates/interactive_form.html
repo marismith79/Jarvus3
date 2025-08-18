@@ -1,0 +1,790 @@
+{% extends "base.html" %}
+
+{% block title %}Interactive Form Editor{% endblock %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/interactive_form.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="interactive-form-container">
+    <!-- Header -->
+    <div class="form-header">
+        <div class="form-title">
+            <h2><i class="fas fa-file-medical"></i> Interactive Prior Authorization Form</h2>
+            <div class="form-meta">
+                <span class="patient-info">Patient: <strong id="patient-name">Loading...</strong></span>
+                <span class="cpt-info">CPT: <strong id="cpt-code">Loading...</strong></span>
+                <span class="insurance-info">Insurance: <strong id="insurance-provider">Loading...</strong></span>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveForm()">
+                <i class="fas fa-save"></i> Save
+            </button>
+            <button class="btn btn-success" onclick="finalizeForm()">
+                <i class="fas fa-check"></i> Finalize
+            </button>
+            <button class="btn btn-info" onclick="exportForm()">
+                <i class="fas fa-download"></i> Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Progress and Status -->
+    <div class="form-progress">
+        <div class="progress-bar">
+            <div class="progress-fill" id="form-progress-fill" style="width: 0%"></div>
+        </div>
+        <div class="progress-text" id="form-progress-text">0% Complete</div>
+        <div class="form-status" id="form-status">
+            <span class="status-badge status-active">Active</span>
+            <span class="validation-errors" id="validation-errors-count">0 errors</span>
+        </div>
+    </div>
+
+    <!-- Main Form Content -->
+    <div class="form-content">
+        <div class="form-sections" id="form-sections">
+            <!-- Form sections will be dynamically loaded here -->
+        </div>
+    </div>
+
+    <!-- Sidebar for Expert Help and Suggestions -->
+    <div class="form-sidebar">
+        <div class="sidebar-section">
+            <h4><i class="fas fa-lightbulb"></i> Auto Suggestions</h4>
+            <div class="suggestions-list" id="auto-suggestions">
+                <!-- Auto suggestions will be loaded here -->
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <h4><i class="fas fa-question-circle"></i> Expert Help</h4>
+            <div class="expert-help" id="expert-help">
+                <button class="btn btn-outline-primary btn-sm" onclick="requestExpertHelp()">
+                    <i class="fas fa-user-md"></i> Ask Expert
+                </button>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <h4><i class="fas fa-search"></i> EHR Search</h4>
+            <div class="ehr-search" id="ehr-search">
+                <input type="text" id="search-field" placeholder="Search EHR for field..." class="form-control">
+                <button class="btn btn-outline-secondary btn-sm" onclick="searchEHR()">
+                    <i class="fas fa-search"></i> Search
+                </button>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <h4><i class="fas fa-comment"></i> Clinician Messages</h4>
+            <div class="clinician-messages" id="clinician-messages">
+                <button class="btn btn-outline-warning btn-sm" onclick="draftClinicianMessage()">
+                    <i class="fas fa-paper-plane"></i> Draft Message
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Expert Help Modal -->
+<div class="modal fade" id="expert-help-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Request Expert Help</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="help-field-select">Field:</label>
+                    <select id="help-field-select" class="form-control">
+                        <!-- Fields will be populated dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="help-question">Question:</label>
+                    <textarea id="help-question" class="form-control" rows="3" placeholder="Describe what you need help with..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="help-context">Context (optional):</label>
+                    <textarea id="help-context" class="form-control" rows="2" placeholder="Additional context..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitExpertHelp()">Submit Request</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Clinician Message Modal -->
+<div class="modal fade" id="clinician-message-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Draft Clinician Message</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="message-field-select">Field:</label>
+                    <select id="message-field-select" class="form-control">
+                        <!-- Fields will be populated dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="missing-info">Missing Information:</label>
+                    <textarea id="missing-info" class="form-control" rows="3" placeholder="Describe what information is missing..."></textarea>
+                </div>
+                <div class="message-preview" id="message-preview">
+                    <!-- Message preview will be shown here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="sendClinicianMessage()">Send Message</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- EHR Search Results Modal -->
+<div class="modal fade" id="ehr-search-modal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">EHR Search Results</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="search-results" id="ehr-search-results">
+                    <!-- Search results will be shown here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="applySearchResult()">Apply Selected Result</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Expert Response Modal -->
+<div class="modal fade" id="expert-response-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Expert Response</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="expert-response" id="expert-response-content">
+                    <!-- Expert response will be shown here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="applyExpertSuggestion()">Apply Suggestion</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Global variables
+let currentSessionId = null;
+let currentFormData = null;
+let currentFormTemplate = null;
+let selectedFieldForHelp = null;
+let selectedFieldForMessage = null;
+let selectedSearchResult = null;
+
+// Initialize form when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Get session ID from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    
+    if (sessionId) {
+        currentSessionId = sessionId;
+        loadFormSession();
+    } else {
+        // Create new session from auth ID
+        const authId = urlParams.get('auth_id');
+        if (authId) {
+            createFormSession(authId);
+        } else {
+            showError('No session ID or auth ID provided');
+        }
+    }
+});
+
+async function createFormSession(authId) {
+    try {
+        // Get auth data first
+        const authResponse = await fetch(`/api/prior-auths/all`);
+        const auths = await authResponse.json();
+        const auth = auths.find(a => a.id == authId);
+        
+        if (!auth) {
+            showError('Prior authorization not found');
+            return;
+        }
+        
+        const response = await fetch('/api/form-session/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                auth_id: authId,
+                patient_mrn: auth.patient_mrn,
+                insurance_provider: auth.insurance_provider,
+                cpt_code: auth.cpt_code,
+                coverage_analysis: null // Will be loaded from step 1 results
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            currentSessionId = result.session_id;
+            currentFormData = result.session;
+            currentFormTemplate = result.session.form_template;
+            
+            // Update URL with session ID
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('session_id', currentSessionId);
+            window.history.replaceState({}, '', newUrl);
+            
+            renderForm();
+            updateFormStatus();
+        } else {
+            showError('Failed to create form session: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error creating form session:', error);
+        showError('Error creating form session: ' + error.message);
+    }
+}
+
+async function loadFormSession() {
+    try {
+        const response = await fetch(`/api/form-session/${currentSessionId}/status`);
+        const result = await response.json();
+        
+        if (result.success) {
+            currentFormData = result;
+            currentFormTemplate = result.form_preview.form_name;
+            renderForm();
+            updateFormStatus();
+        } else {
+            showError('Failed to load form session: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error loading form session:', error);
+        showError('Error loading form session: ' + error.message);
+    }
+}
+
+function renderForm() {
+    if (!currentFormData || !currentFormTemplate) return;
+    
+    const sectionsContainer = document.getElementById('form-sections');
+    sectionsContainer.innerHTML = '';
+    
+    // Update header info
+    document.getElementById('patient-name').textContent = currentFormData.patient_mrn || 'Unknown';
+    document.getElementById('cpt-code').textContent = currentFormData.cpt_code || 'Unknown';
+    document.getElementById('insurance-provider').textContent = currentFormData.insurance_provider || 'Unknown';
+    
+    // Render form sections
+    const formPreview = currentFormData.form_preview;
+    
+    formPreview.sections.forEach(section => {
+        const sectionElement = createSectionElement(section);
+        sectionsContainer.appendChild(sectionElement);
+    });
+    
+    // Update progress
+    updateProgress(formPreview.summary);
+    
+    // Load auto suggestions
+    loadAutoSuggestions();
+}
+
+function createSectionElement(section) {
+    const sectionDiv = document.createElement('div');
+    sectionDiv.className = 'form-section';
+    sectionDiv.innerHTML = `
+        <div class="section-header">
+            <h3>${section.title}</h3>
+        </div>
+        <div class="section-fields">
+            ${section.fields.map(field => createFieldElement(field, section.id)).join('')}
+        </div>
+    `;
+    return sectionDiv;
+}
+
+function createFieldElement(field, sectionId) {
+    const fieldDiv = document.createElement('div');
+    fieldDiv.className = `form-field ${field.required ? 'required' : ''} ${field.is_completed ? 'completed' : 'incomplete'}`;
+    
+    const fieldId = `${sectionId}_${field.id}`;
+    
+    fieldDiv.innerHTML = `
+        <div class="field-header">
+            <label for="${fieldId}">${field.label}${field.required ? ' *' : ''}</label>
+            <div class="field-actions">
+                <button class="btn btn-sm btn-outline-info" onclick="searchEHRForField('${field.id}', '${sectionId}')" title="Search EHR">
+                    <i class="fas fa-search"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-primary" onclick="requestHelpForField('${field.id}', '${sectionId}')" title="Ask Expert">
+                    <i class="fas fa-question-circle"></i>
+                </button>
+            </div>
+        </div>
+        <div class="field-input">
+            <input type="text" id="${fieldId}" value="${field.value || ''}" 
+                   class="form-control ${field.is_completed ? 'is-valid' : field.required ? 'is-invalid' : ''}"
+                   onchange="updateField('${sectionId}', '${field.id}', this.value)"
+                   placeholder="${field.required ? 'Required field' : 'Optional field'}">
+        </div>
+        <div class="field-info">
+            <small class="field-source">Source: ${field.source || 'Not available'}</small>
+            ${field.is_completed ? '<span class="field-status completed"><i class="fas fa-check"></i> Complete</span>' : 
+              field.required ? '<span class="field-status incomplete"><i class="fas fa-exclamation-triangle"></i> Required</span>' : 
+              '<span class="field-status optional"><i class="fas fa-info-circle"></i> Optional</span>'}
+        </div>
+    `;
+    
+    return fieldDiv;
+}
+
+async function updateField(sectionId, fieldId, value) {
+    if (!currentSessionId) return;
+    
+    try {
+        const response = await fetch(`/api/form-session/${currentSessionId}/update-field`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                section_id: sectionId,
+                field_id: fieldId,
+                value: value,
+                source: 'human_edit'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Update local data
+            if (!currentFormData.form_data) currentFormData.form_data = {};
+            if (!currentFormData.form_data.patient_info) currentFormData.form_data.patient_info = {};
+            if (!currentFormData.form_data.patient_info[sectionId]) currentFormData.form_data.patient_info[sectionId] = {};
+            
+            currentFormData.form_data.patient_info[sectionId][fieldId] = {
+                value: value,
+                source: 'human_edit'
+            };
+            
+            // Update form status
+            updateFormStatus();
+            
+            // Show success feedback
+            showSuccess(`Field "${fieldId}" updated successfully`);
+        } else {
+            showError('Failed to update field: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error updating field:', error);
+        showError('Error updating field: ' + error.message);
+    }
+}
+
+function updateProgress(summary) {
+    const progressFill = document.getElementById('form-progress-fill');
+    const progressText = document.getElementById('form-progress-text');
+    const validationErrors = document.getElementById('validation-errors-count');
+    
+    const completionPercentage = (summary.completed_fields / Math.max(summary.total_fields, 1)) * 100;
+    
+    progressFill.style.width = `${completionPercentage}%`;
+    progressText.textContent = `${Math.round(completionPercentage)}% Complete`;
+    validationErrors.textContent = `${summary.missing_required} required fields missing`;
+}
+
+function updateFormStatus() {
+    // This would update the form status based on current validation state
+    // Implementation depends on the specific status requirements
+}
+
+function loadAutoSuggestions() {
+    const suggestionsContainer = document.getElementById('auto-suggestions');
+    
+    if (currentFormData.auto_suggestions && currentFormData.auto_suggestions.length > 0) {
+        suggestionsContainer.innerHTML = currentFormData.auto_suggestions.map(suggestion => `
+            <div class="suggestion-item ${suggestion.priority}">
+                <div class="suggestion-header">
+                    <i class="fas fa-lightbulb"></i>
+                    <span class="suggestion-type">${suggestion.type}</span>
+                </div>
+                <div class="suggestion-message">${suggestion.message}</div>
+                <div class="suggestion-actions">
+                    <button class="btn btn-sm btn-primary" onclick="applySuggestion('${suggestion.field_id}')">
+                        Apply
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        suggestionsContainer.innerHTML = '<p class="text-muted">No suggestions available</p>';
+    }
+}
+
+async function searchEHRForField(fieldId, sectionId) {
+    selectedFieldForHelp = { fieldId, sectionId };
+    
+    try {
+        const response = await fetch(`/api/form-session/${currentSessionId}/search-ehr`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                field_id: fieldId
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showEHRSearchResults(result);
+        } else {
+            showError('Failed to search EHR: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error searching EHR:', error);
+        showError('Error searching EHR: ' + error.message);
+    }
+}
+
+function showEHRSearchResults(searchResult) {
+    const resultsContainer = document.getElementById('ehr-search-results');
+    
+    if (searchResult.found_documents && searchResult.found_documents.length > 0) {
+        resultsContainer.innerHTML = `
+            <div class="search-summary">
+                <h6>Found ${searchResult.found_documents.length} relevant documents for "${searchResult.field_id}"</h6>
+                <p>Search terms: ${searchResult.search_terms.join(', ')}</p>
+            </div>
+            <div class="search-results-list">
+                ${searchResult.found_documents.map((doc, index) => `
+                    <div class="search-result-item" onclick="selectSearchResult(${index})">
+                        <div class="result-header">
+                            <h6>${doc.type}</h6>
+                            <span class="result-date">${doc.date}</span>
+                            <span class="result-relevance ${doc.relevance}">${doc.relevance}</span>
+                        </div>
+                        <div class="result-content">${doc.content.substring(0, 200)}...</div>
+                        <div class="result-suggestion">
+                            <strong>Suggested value:</strong> ${searchResult.suggested_value}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        resultsContainer.innerHTML = '<p class="text-muted">No relevant documents found</p>';
+    }
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('ehr-search-modal'));
+    modal.show();
+}
+
+function selectSearchResult(index) {
+    // Remove previous selection
+    document.querySelectorAll('.search-result-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+    
+    // Select new item
+    const items = document.querySelectorAll('.search-result-item');
+    if (items[index]) {
+        items[index].classList.add('selected');
+        selectedSearchResult = index;
+    }
+}
+
+function applySearchResult() {
+    if (selectedSearchResult === null || !selectedFieldForHelp) return;
+    
+    // Get the suggested value from the selected result
+    const resultItems = document.querySelectorAll('.search-result-item');
+    const selectedItem = resultItems[selectedSearchResult];
+    const suggestedValue = selectedItem.querySelector('.result-suggestion').textContent.replace('Suggested value:', '').trim();
+    
+    // Update the field
+    updateField(selectedFieldForHelp.sectionId, selectedFieldForHelp.fieldId, suggestedValue);
+    
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('ehr-search-modal'));
+    modal.hide();
+    
+    // Reset selection
+    selectedSearchResult = null;
+    selectedFieldForHelp = null;
+}
+
+async function requestHelpForField(fieldId, sectionId) {
+    selectedFieldForHelp = { fieldId, sectionId };
+    
+    // Populate field select
+    const fieldSelect = document.getElementById('help-field-select');
+    fieldSelect.innerHTML = `<option value="${fieldId}">${fieldId}</option>`;
+    fieldSelect.value = fieldId;
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('expert-help-modal'));
+    modal.show();
+}
+
+async function submitExpertHelp() {
+    if (!selectedFieldForHelp || !currentSessionId) return;
+    
+    const fieldId = document.getElementById('help-field-select').value;
+    const question = document.getElementById('help-question').value;
+    const context = document.getElementById('help-context').value;
+    
+    if (!question.trim()) {
+        showError('Please enter a question');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/form-session/${currentSessionId}/request-help`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                field_id: fieldId,
+                question: question,
+                context: context
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showSuccess('Expert help requested successfully');
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('expert-help-modal'));
+            modal.hide();
+            
+            // Clear form
+            document.getElementById('help-question').value = '';
+            document.getElementById('help-context').value = '';
+            
+            // Show expert response (simulated)
+            showExpertResponse(fieldId);
+        } else {
+            showError('Failed to request expert help: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error requesting expert help:', error);
+        showError('Error requesting expert help: ' + error.message);
+    }
+}
+
+function showExpertResponse(fieldId) {
+    // Simulate expert response for demo
+    const expertResponses = {
+        'genetic_counseling': {
+            response: 'Check the "Genetic Counseling Note" document in the patient\'s chart. If not found, request a genetic counseling consultation.',
+            action: 'search_documents',
+            search_terms: ['genetic counseling', 'counseling note']
+        },
+        'family_history': {
+            response: 'Look for "Family History Assessment" or check oncology consultation notes for family history documentation.',
+            action: 'search_documents',
+            search_terms: ['family history', 'hereditary']
+        },
+        'clinical_indication': {
+            response: 'Use the diagnosis and stage from pathology report to create clinical indication.',
+            action: 'computed_field',
+            computation: 'diagnosis + stage'
+        }
+    };
+    
+    const response = expertResponses[fieldId] || {
+        response: 'Please review the patient\'s clinical documentation for this information.',
+        action: 'manual_review'
+    };
+    
+    const responseContainer = document.getElementById('expert-response-content');
+    responseContainer.innerHTML = `
+        <div class="expert-response-item">
+            <div class="response-header">
+                <i class="fas fa-user-md"></i>
+                <span>Expert Response for ${fieldId}</span>
+            </div>
+            <div class="response-content">
+                <p>${response.response}</p>
+                ${response.action ? `<p><strong>Recommended Action:</strong> ${response.action}</p>` : ''}
+                ${response.search_terms ? `<p><strong>Search Terms:</strong> ${response.search_terms.join(', ')}</p>` : ''}
+            </div>
+        </div>
+    `;
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('expert-response-modal'));
+    modal.show();
+}
+
+function applyExpertSuggestion() {
+    if (!selectedFieldForHelp) return;
+    
+    // For demo purposes, apply a default suggestion
+    const suggestions = {
+        'genetic_counseling': 'Completed',
+        'family_history': 'Positive family history documented',
+        'clinical_indication': 'Advanced cancer requiring targeted therapy'
+    };
+    
+    const suggestion = suggestions[selectedFieldForHelp.fieldId] || 'Information documented';
+    updateField(selectedFieldForHelp.sectionId, selectedFieldForHelp.fieldId, suggestion);
+    
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('expert-response-modal'));
+    modal.hide();
+    
+    selectedFieldForHelp = null;
+}
+
+async function draftClinicianMessage() {
+    // Populate field select with missing required fields
+    const fieldSelect = document.getElementById('message-field-select');
+    const missingFields = currentFormData.form_preview.summary.missing_required || 0;
+    
+    if (missingFields === 0) {
+        showInfo('No missing required fields to request');
+        return;
+    }
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('clinician-message-modal'));
+    modal.show();
+}
+
+async function sendClinicianMessage() {
+    if (!currentSessionId) return;
+    
+    const fieldId = document.getElementById('message-field-select').value;
+    const missingInfo = document.getElementById('missing-info').value;
+    
+    if (!missingInfo.trim()) {
+        showError('Please describe the missing information');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/form-session/${currentSessionId}/draft-form-message`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                field_id: fieldId,
+                missing_info: missingInfo
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showSuccess('Clinician message drafted successfully');
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('clinician-message-modal'));
+            modal.hide();
+            
+            // Clear form
+            document.getElementById('missing-info').value = '';
+        } else {
+            showError('Failed to draft message: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error drafting message:', error);
+        showError('Error drafting message: ' + error.message);
+    }
+}
+
+async function finalizeForm() {
+    if (!currentSessionId) return;
+    
+    if (!confirm('Are you sure you want to finalize this form? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/form-session/${currentSessionId}/finalize`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showSuccess('Form finalized successfully!');
+            
+            // Redirect to dashboard or show completion page
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
+        } else {
+            showError('Failed to finalize form: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error finalizing form:', error);
+        showError('Error finalizing form: ' + error.message);
+    }
+}
+
+function saveForm() {
+    showSuccess('Form saved successfully');
+}
+
+function exportForm() {
+    showInfo('Form export functionality would be implemented here');
+}
+
+// Utility functions
+function showSuccess(message) {
+    // Implement success notification
+    console.log('Success:', message);
+}
+
+function showError(message) {
+    // Implement error notification
+    console.error('Error:', message);
+}
+
+function showInfo(message) {
+    // Implement info notification
+    console.log('Info:', message);
+}
+</script>
+{% endblock %}
