@@ -4,84 +4,10 @@
 
 {% block page_css %}
 <link href="{{ url_for('static', filename='css/agent_setup.css') }}" rel="stylesheet">
-<style>
-    /* Override base template container for full-width layout */
-    .main-content {
-        padding: 0 !important;
-        max-width: none !important;
-    }
-    
-    .container {
-        max-width: none !important;
-        padding: 0 !important;
-    }
-</style>
 {% endblock %}
 
 {% block content %}
 <div class="work-queue-container">
-    <!-- EPIC-style Action Bar -->
-    <div class="epic-action-bar">
-        <button class="epic-action-btn" onclick="loadWorkflows()" title="Refresh">
-            <i class="fas fa-sync-alt"></i>
-            Refresh
-        </button>
-        <button class="epic-action-btn" onclick="startCreate()" title="New Workflow">
-            <i class="fas fa-plus"></i>
-            New Workflow
-        </button>
-        <button class="epic-action-btn" onclick="exportWorkflows()" title="Export">
-            <i class="fas fa-download"></i>
-            Export
-        </button>
-        <button class="epic-action-btn" onclick="importWorkflows()" title="Import">
-            <i class="fas fa-upload"></i>
-            Import
-        </button>
-        <button class="epic-action-btn" onclick="showSettings()" title="Settings">
-            <i class="fas fa-cog"></i>
-            Settings
-        </button>
-    </div>
-
-    <!-- EPIC-style Tab Navigation -->
-    <div class="epic-tab-navigation">
-        <button class="epic-tab-button active" data-tab="workflows">
-            Workflows (<span id="workflow-count">0</span>)
-        </button>
-        <button class="epic-tab-button" data-tab="templates">
-            Templates (<span id="template-count">0</span>)
-        </button>
-        <button class="epic-tab-button" data-tab="settings">
-            Settings
-        </button>
-    </div>
-
-    <!-- EPIC-style Search and Filter Bar -->
-    <div class="epic-filter-bar">
-        <div class="epic-search-box">
-            <i class="fas fa-search"></i>
-            <input type="text" id="search-input" placeholder="Search workflows...">
-        </div>
-        <div class="epic-filter-controls">
-            <select id="status-filter" class="epic-select">
-                <option value="">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="draft">Draft</option>
-                <option value="archived">Archived</option>
-            </select>
-            <select id="type-filter" class="epic-select">
-                <option value="">All Types</option>
-                <option value="prior-auth">Prior Authorization</option>
-                <option value="claims">Claims</option>
-                <option value="eligibility">Eligibility</option>
-            </select>
-        </div>
-        <div class="epic-status-info">
-            <span class="status-text">Last updated: <span id="last-updated-time">Never</span></span>
-        </div>
-    </div>
-
     <!-- Main Content Area -->
     <div class="workflow-layout">
         <div class="workflow-sidebar">
@@ -138,7 +64,7 @@
                         <div id="viewNuances" class="mb-2"></div>
                         <div id="editNuances" class="d-none"></div>
                         <button id="addNuanceBtn" class="btn btn-sm btn-outline-primary d-none" type="button">
-                            <i class="fas fa-plus"></i> Add +
+                            <i class="fas fa-plus"></i> Add
                         </button>
                     </div>
                 </div>
@@ -153,8 +79,8 @@
                         <div id="nameError" class="invalid-feedback"></div>
                     </div>
                     <div class="mb-3">
-                        <label for="createDescription" class="form-label">Description</label>
-                        <textarea id="createDescription" class="form-control" rows="5" placeholder="Describe this workflow"></textarea>
+                        <label for="createDescription" class="form-label">Data Location</label>
+                        <textarea id="createDescription" class="form-control" rows="5" placeholder="Describe where in the patient chart this agent should look and be detailed about edge cases"></textarea>
                     </div>
                     <div class="mb-3">
                         <label for="createCpt" class="form-label">CPT Code</label>
@@ -164,7 +90,7 @@
                         <label class="form-label">Payer Nuances</label>
                         <div id="createNuances"></div>
                         <button id="createAddNuanceBtn" class="btn btn-sm btn-outline-primary" type="button">
-                            <i class="fas fa-plus"></i> Add +
+                            <i class="fas fa-plus"></i> Add
                         </button>
                     </div>
                 </div>
@@ -249,12 +175,6 @@
                 });
                 listEl.appendChild(item);
             });
-            
-            // Update workflow count
-            document.getElementById('workflow-count').textContent = data.length;
-            
-            // Update last updated time
-            document.getElementById('last-updated-time').textContent = new Date().toLocaleTimeString();
         }
 
         async function showWorkflow(id) {
@@ -479,21 +399,7 @@
         createSubmit.addEventListener('click', submitCreate);
         createCancel.addEventListener('click', () => showPanel(placeholder));
 
-        // Action bar functions
-        window.loadWorkflows = loadWorkflows;
-        window.startCreate = startCreate;
-        window.exportWorkflows = () => {
-            // TODO: Implement export functionality
-            console.log('Export workflows');
-        };
-        window.importWorkflows = () => {
-            // TODO: Implement import functionality
-            console.log('Import workflows');
-        };
-        window.showSettings = () => {
-            // TODO: Implement settings functionality
-            console.log('Show settings');
-        };
+
 
         loadWorkflows();
     })();

@@ -50,6 +50,7 @@ background_tasks = {}
 automation_details = {}
 
 @app.route('/')
+@app.route('/dashboard')
 def dashboard():
     """Main dashboard page"""
     try:
