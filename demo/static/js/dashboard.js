@@ -2112,24 +2112,24 @@ async function startFormAgentProcessing() {
                                 progressFill.style.width = data.progress + '%';
                                 processingTimeSpan.textContent = `${processingTime}s`;
                                 
-                                // Show completion message
-                                setTimeout(() => {
-                                    const completionMessage = document.createElement('div');
-                                    completionMessage.className = 'completion-message success';
-                                    completionMessage.innerHTML = `
-                                        <i class="fas fa-check-circle"></i>
-                                        <span>All ${data.total_questions} questions processed by agent! You can now edit any answers as needed.</span>
-                                    `;
-                                    document.getElementById('form-processing-summary').appendChild(completionMessage);
-                                }, 1000);
+                                // // Show completion message
+                                // setTimeout(() => {
+                                //     const completionMessage = document.createElement('div');
+                                //     completionMessage.className = 'completion-message success';
+                                //     completionMessage.innerHTML = `
+                                //         <i class="fas fa-check-circle"></i>
+                                //         <span>All ${data.total_questions} questions processed by agent! You can now edit any answers as needed.</span>
+                                //     `;
+                                //     document.getElementById('form-processing-summary').appendChild(completionMessage);
+                                // }, 1000);
                                 
                                 // Enable save and export buttons
-                                saveBtn.style.display = 'inline-block';
+                                // saveBtn.style.display = 'inline-block';
                                 exportBtn.style.display = 'inline-block';
                                 
-                                // Reset start button
-                                startBtn.disabled = false;
-                                startBtn.innerHTML = '<i class="fas fa-play"></i> Start Agent Processing';
+                                // // Reset start button
+                                // startBtn.disabled = false;
+                                // startBtn.innerHTML = '<i class="fas fa-play"></i> Start Agent Processing';
                                 return;
                                 
                             case 'error':

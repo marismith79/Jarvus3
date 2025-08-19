@@ -352,8 +352,8 @@
       }
     },
     "coverage": {
-      "payer": "Medicare",
-      "plan_type": "Medicare",
+      "payer": "Husky Health Medicaid",
+      "plan_type": "Medicaid",
       "member_id": "1440801160",
       "group_id": "37552",
       "effective_start": "2024-04-18",
@@ -585,11 +585,18 @@
         "text": "S: Mia Anderson seen for follow-up of metastatic colorectal cancer, stage IV. Fatigue 3/10; mild DOE. O: ECOG 1, vitals stable. A: Metastatic CRC. P: Order BRAF p.V600E targeted mutation analysis (CPT 81241) on tumor specimen; submit prior authorization with supporting pathology and limited prior testing."
       },
       {
+        "note_id": "clinical-indication-braf-test",
+        "type": "Treatment Planning Note",
+        "author": "Dr. Jordan Rivera",
+        "date": "2025-01-13",
+        "text": "CLINICAL INDICATION FOR BRAF p.V600E TESTING: Patient has metastatic colorectal cancer (stage IV) with confirmed dMMR status by IHC (MLH1/PMS2 loss with positive MLH1 promoter methylation). Prior testing shows KRAS and NRAS are wild-type. BRAF p.V600E mutation status is critical for treatment decision-making as it determines eligibility for targeted therapy with BRAF inhibitors (encorafenib + cetuximab) versus immunotherapy. Current NCCN guidelines recommend BRAF testing for all metastatic CRC patients to guide first-line and subsequent therapy selection. This test will directly impact treatment choice and patient outcomes. Medical necessity established per NCCN guidelines v2.2024 for metastatic colorectal cancer."
+      },
+      {
         "note_id": "0f7afa2b-650c-431b-9138-cb3a23d8b724",
         "type": "Oncology Consult",
         "author": "Dr. Jordan Rivera",
         "date": "2024-07-09",
-        "text": "Reason: metastatic colorectal cancer. AJCC stage IV; ECOG 1. Family history reviewed; genetic counseling offered. Plan: characterize dMMR status and RAS/BRAF to guide therapy."
+        "text": "Reason: metastatic colorectal cancer. AJCC stage IV; ECOG 1. Family history reviewed; genetic counseling offered. Plan: characterize dMMR status and RAS/BRAF to guide therapy. CLINICAL INDICATION: BRAF p.V600E testing required for treatment selection between BRAF inhibitor therapy (encorafenib + cetuximab) versus immunotherapy in metastatic CRC. NCCN guidelines mandate BRAF testing for all metastatic CRC patients."
       },
       {
         "note_id": "7e8ab43e-fed5-45ea-8294-d9e762b4efed",
@@ -617,7 +624,7 @@
         "type": "Utilization Management Communication",
         "author": "Prior Auth Coordinator",
         "date": "2025-07-13",
-        "text": "PA PA7073292 submitted for BRAF p.V600E Targeted Mutation Analysis (CPT 81241). Attachments: pathology synoptic, molecular order, clinic note. Rationale: metastatic disease, RAS WT; BRAF status will directly guide targeted therapy and trial eligibility."
+        "text": "PA PA7073292 submitted for BRAF p.V600E Targeted Mutation Analysis (CPT 81241). Attachments: pathology synoptic, molecular order, clinic note. CLINICAL INDICATION: Patient has metastatic colorectal cancer (stage IV) with dMMR status confirmed. BRAF p.V600E testing is medically necessary per NCCN guidelines to determine eligibility for BRAF inhibitor therapy (encorafenib + cetuximab) versus immunotherapy. This test will directly impact treatment selection and patient outcomes."
       },
       {
         "note_id": "cc7600f3-13a3-4a46-822f-87524cac7007",
