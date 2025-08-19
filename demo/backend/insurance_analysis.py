@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 # Import configuration
-from config.mac_jurisdictions import MAC_JURISDICTIONS, STATE_MAPPING
+from config.mac_jurisdictions import MAC_JURISDICTIONS, STATE_MAPPING, CPT_POLICY_URLS, DIRECT_POLICY_URLS, MEDICAID_POLICY_URLS
 from config.gpt_prompts import (
     create_medicare_search_prompt,
     create_general_insurance_search_prompt,
@@ -145,90 +145,6 @@ class EnhancedInsuranceAnalysis:
         
         return None
         
-    # async def analyze_insurance_coverage_and_requirements(
-    #     self, 
-    #     cpt_code: str, 
-    #     insurance_provider: str, 
-    #     service_type: str,
-    #     patient_context: Optional[Dict] = None,
-    #     patient_address: Optional[str] = None
-    # ) -> CoverageAnalysis:
-    #     """
-    #     Main method that combines coverage determination and requirements extraction.
-        
-    #     Args:
-    #         cpt_code: CPT code for the service
-    #         insurance_provider: Name of insurance provider
-    #         service_type: Type of service (e.g., "genetic testing", "imaging")
-    #         patient_context: Optional patient context for criteria matching
-    #         patient_address: Optional patient address for state extraction
-            
-    #     Returns:
-    #         CoverageAnalysis object with comprehensive results
-    #     """
-        
-    #     # Determine MAC jurisdiction for Medicare patients
-    #     mac_jurisdiction = None
-    #     if any(medicare_term in insurance_provider.lower() 
-    #            for medicare_term in ['medicare', 'original medicare', 'cms']):
-            
-    #         # Try to get state from patient context first
-    #         patient_state = None
-    #         if patient_context and patient_context.get('patient_state'):
-    #             patient_state = patient_context.get('patient_state')
-    #         elif patient_address:
-    #             # Extract state from address if not in context
-    #             patient_state = self.extract_patient_state_from_address(patient_address)
-            
-    #         if patient_state:
-    #             mac_jurisdiction = self.get_mac_jurisdiction(patient_state)
-        
-    #     # Step 1: Search for medical policy documents using GPT-5 search mode
-    #     print(f"🔍 Starting insurance analysis for CPT {cpt_code}, Provider: {insurance_provider}")
-    #     if mac_jurisdiction:
-    #         print(f"🏛️  MAC Jurisdiction: {mac_jurisdiction['name']} ({mac_jurisdiction['jurisdiction_id']})")
-        
-    #     search_results = await self._search_medical_policies_with_gpt5(
-    #         cpt_code, insurance_provider, service_type, mac_jurisdiction
-    #     )
-        
-    #     print(f"📊 Found {len(search_results)} search results")
-        
-    #     # Step 2: Extract and parse policy documents using GPT
-    #     policy_documents = await self._extract_policy_documents_with_gpt(search_results)
-        
-    #     # Step 3: Analyze coverage and extract requirements using GPT
-    #     coverage_info = await self._analyze_coverage_and_requirements_with_gpt(
-    #         cpt_code, insurance_provider, policy_documents, patient_context, mac_jurisdiction
-    #     )
-        
-    #     # Step 4: Check patient criteria against requirements
-    #     patient_criteria_match = {}
-    #     if patient_context:
-    #         patient_criteria_match = await self._check_patient_criteria_with_gpt(
-    #             coverage_info.requirements, patient_context
-    #         )
-        
-    #     # Step 5: Generate recommendations using GPT
-    #     recommendations = await self._generate_recommendations_with_gpt(
-    #         coverage_info, patient_criteria_match, patient_context
-    #     )
-        
-    #     return CoverageAnalysis(
-    #         cpt_code=cpt_code,
-    #         insurance_provider=insurance_provider,
-    #         coverage_status=coverage_info.coverage_status,
-    #         coverage_details=coverage_info.coverage_details,
-    #         requirements=coverage_info.requirements,
-    #         patient_criteria_match=patient_criteria_match,
-    #         confidence_score=coverage_info.confidence_score,
-    #         search_sources=search_results,
-    #         recommendations=recommendations,
-    #         mac_jurisdiction=mac_jurisdiction["name"] if mac_jurisdiction else None,
-    #         ncd_applicable=coverage_info.ncd_applicable if hasattr(coverage_info, 'ncd_applicable') else False,
-    #         lcd_applicable=coverage_info.lcd_applicable if hasattr(coverage_info, 'lcd_applicable') else False
-    #     )
-    
     async def _search_medical_policies_with_gpt5(
         self, 
         cpt_code: str, 
@@ -238,7 +154,7 @@ class EnhancedInsuranceAnalysis:
     ) -> List[Dict]:
         """
         Use GPT-5 search mode to find relevant medical policy documents.
-        Specifically targets Medicare NCDs, LCDs, and LCAs for Medicare providers.
+        Enhanced to combine direct URL fetching with search queries for comprehensive coverage.
         """
         
         # Create cache key including MAC jurisdiction
@@ -248,18 +164,25 @@ class EnhancedInsuranceAnalysis:
         if cache_key in self.search_cache:
             return self.search_cache[cache_key]
         
-        # Generate search queries optimized for Medicare documents
+        all_search_results = []
+        
+        # Step 1: Fetch direct policy documents from known URLs
+        print(f"🔗 Fetching direct policy documents for {cpt_code}...")
+        direct_documents = await self._fetch_direct_policy_documents(
+            cpt_code, insurance_provider, service_type, mac_jurisdiction
+        )
+        all_search_results.extend(direct_documents)
+        
+        # Step 2: Generate search queries for additional coverage
         search_queries = self._generate_medicare_search_queries(
             cpt_code, insurance_provider, service_type, mac_jurisdiction
         )
         
-        all_search_results = []
-        
-        # Run searches in smaller batches to avoid overwhelming the API
+        # Step 3: Run searches in smaller batches to avoid overwhelming the API
         print(f"🚀 Starting GPT-5 searches for {len(search_queries)} queries...")
         
         # Take more queries since GPT-4o is faster
-        important_queries = search_queries[:12]  # Increased from 5 to 12
+        important_queries = search_queries[:8]  # Reduced from 12 to 8 since we have direct URLs
         print(f"📝 Using top {len(important_queries)} queries for comprehensive search")
         
         # Create tasks for the important searches
@@ -295,9 +218,17 @@ class EnhancedInsuranceAnalysis:
         unique_results = self._deduplicate_results(all_search_results)
         unique_results.sort(key=lambda x: x.get('relevance', 0), reverse=True)
         
-        # Cache results
-        self.search_cache[cache_key] = unique_results[:10]  # Keep top 10 results
+        # Prioritize direct access documents
+        direct_results = [r for r in unique_results if r.get('direct_access', False)]
+        search_results = [r for r in unique_results if not r.get('direct_access', False)]
         
+        # Combine with direct results first
+        final_results = direct_results + search_results[:10]  # Keep top 10 search results
+        
+        # Cache results
+        self.search_cache[cache_key] = final_results
+        
+        print(f"📊 Total results: {len(final_results)} ({len(direct_results)} direct, {len(search_results[:10])} search)")
         return self.search_cache[cache_key]
     
     def _generate_medicare_search_queries(
@@ -309,6 +240,7 @@ class EnhancedInsuranceAnalysis:
     ) -> List[str]:
         """
         Generate comprehensive search queries for all Medicare document types and supporting documents.
+        Enhanced with direct URLs for faster and more accurate policy document retrieval.
         """
         
         queries = []
@@ -322,6 +254,15 @@ class EnhancedInsuranceAnalysis:
                          for medicaid_term in ['medicaid', 'husky', 'state health'])
         
         if is_medicare:
+            # Add direct URLs from CPT-specific database for immediate access
+            if cpt_code in CPT_POLICY_URLS:
+                for url in CPT_POLICY_URLS[cpt_code]:
+                    queries.append(f"site:{url} {cpt_code} {service_type}")
+            
+            # Add direct URLs from general policy database
+            for url in DIRECT_POLICY_URLS[:10]:  # Limit to top 10 to avoid overwhelming
+                queries.append(f"site:{url} {cpt_code} {service_type}")
+            
             # Core Medicare Coverage Documents (NCDs, LCDs, LCAs)
             queries.extend([
                 f"Medicare NCD {cpt_code} {service_type}",
@@ -365,6 +306,21 @@ class EnhancedInsuranceAnalysis:
             if mac_jurisdiction:
                 mac_name = mac_jurisdiction["name"]
                 mac_id = mac_jurisdiction["jurisdiction_id"]
+                
+                # Add direct MAC policy URLs if available
+                if "policy_urls" in mac_jurisdiction:
+                    policy_urls = mac_jurisdiction["policy_urls"]
+                    if "genetic_testing" in policy_urls:
+                        queries.append(f"site:{policy_urls['genetic_testing']} {cpt_code} {service_type}")
+                    if "molecular_diagnostics" in policy_urls:
+                        queries.append(f"site:{policy_urls['molecular_diagnostics']} {cpt_code} {service_type}")
+                    if "lcd_search" in policy_urls:
+                        queries.append(f"site:{policy_urls['lcd_search']} {cpt_code} {service_type}")
+                    if "ncd_search" in policy_urls:
+                        queries.append(f"site:{policy_urls['ncd_search']} {cpt_code} {service_type}")
+                    if "coverage_database" in policy_urls:
+                        queries.append(f"site:{policy_urls['coverage_database']} {cpt_code} {service_type}")
+                
                 queries.extend([
                     f"{mac_name} Medicare {cpt_code} {service_type}",
                     f"{mac_name} LCD {cpt_code} {service_type}",
@@ -419,6 +375,28 @@ class EnhancedInsuranceAnalysis:
             ])
             
         elif is_medicaid:
+            # Add direct Medicaid URLs if available
+            medicaid_state = None
+            for state, medicaid_info in MEDICAID_POLICY_URLS.items():
+                if any(state_term in insurance_provider.lower() for state_term in [state, medicaid_info["provider_name"].lower()]):
+                    medicaid_state = state
+                    break
+            
+            if medicaid_state and medicaid_state in MEDICAID_POLICY_URLS:
+                medicaid_info = MEDICAID_POLICY_URLS[medicaid_state]
+                if "policy_urls" in medicaid_info:
+                    policy_urls = medicaid_info["policy_urls"]
+                    if "genetic_testing" in policy_urls:
+                        queries.append(f"site:{policy_urls['genetic_testing']} {cpt_code} {service_type}")
+                    if "lab_benefits" in policy_urls:
+                        queries.append(f"site:{policy_urls['lab_benefits']} {cpt_code} {service_type}")
+                    if "physician_benefits" in policy_urls:
+                        queries.append(f"site:{policy_urls['physician_benefits']} {cpt_code} {service_type}")
+                    if "fee_schedules" in policy_urls:
+                        queries.append(f"site:{policy_urls['fee_schedules']} {cpt_code} {service_type}")
+                    if "provider_manual" in policy_urls:
+                        queries.append(f"site:{policy_urls['provider_manual']} {cpt_code} {service_type}")
+            
             # Medicaid-Specific Queries
             queries.extend([
                 f"{insurance_provider} Medicaid medical policy {cpt_code} {service_type}",
@@ -1955,6 +1933,164 @@ class EnhancedInsuranceAnalysis:
             'revision_date': 'N/A',
             'original_search_result': search_result
         }
+    
+    async def _fetch_direct_policy_documents(
+        self, 
+        cpt_code: str, 
+        insurance_provider: str, 
+        service_type: str,
+        mac_jurisdiction: Optional[Dict] = None
+    ) -> List[Dict]:
+        """
+        Fetch policy documents directly from known URLs for faster and more reliable access.
+        This method bypasses search and goes directly to authoritative sources.
+        """
+        
+        direct_documents = []
+        
+        # Check if this is a Medicare provider
+        is_medicare = any(medicare_term in insurance_provider.lower() 
+                         for medicare_term in ['medicare', 'original medicare', 'cms'])
+        
+        # Check if this is a Medicaid provider
+        is_medicaid = any(medicaid_term in insurance_provider.lower() 
+                         for medicaid_term in ['medicaid', 'husky', 'state health'])
+        
+        if is_medicare:
+            # Add CPT-specific direct URLs
+            if cpt_code in CPT_POLICY_URLS:
+                for url in CPT_POLICY_URLS[cpt_code]:
+                    direct_documents.append({
+                        'title': f'Medicare Coverage Decision for {cpt_code}',
+                        'url': url,
+                        'snippet': f'Direct Medicare coverage policy for CPT {cpt_code}',
+                        'relevance': 95,
+                        'type': 'policy_document',
+                        'source': 'Direct URL - CMS',
+                        'direct_access': True
+                    })
+            
+            # Add MAC-specific direct URLs if jurisdiction is known
+            if mac_jurisdiction and "policy_urls" in mac_jurisdiction:
+                policy_urls = mac_jurisdiction["policy_urls"]
+                mac_name = mac_jurisdiction["name"]
+                
+                if "genetic_testing" in policy_urls:
+                    direct_documents.append({
+                        'title': f'{mac_name} Genetic Testing Policy',
+                        'url': policy_urls['genetic_testing'],
+                        'snippet': f'{mac_name} genetic testing coverage policy for {cpt_code}',
+                        'relevance': 90,
+                        'type': 'policy_document',
+                        'source': f'Direct URL - {mac_name}',
+                        'direct_access': True
+                    })
+                
+                if "molecular_diagnostics" in policy_urls:
+                    direct_documents.append({
+                        'title': f'{mac_name} Molecular Diagnostics Policy',
+                        'url': policy_urls['molecular_diagnostics'],
+                        'snippet': f'{mac_name} molecular diagnostics coverage policy for {cpt_code}',
+                        'relevance': 90,
+                        'type': 'policy_document',
+                        'source': f'Direct URL - {mac_name}',
+                        'direct_access': True
+                    })
+                
+                if "lcd_search" in policy_urls:
+                    direct_documents.append({
+                        'title': f'{mac_name} Local Coverage Determinations',
+                        'url': policy_urls['lcd_search'],
+                        'snippet': f'{mac_name} LCD search for {cpt_code}',
+                        'relevance': 85,
+                        'type': 'policy_document',
+                        'source': f'Direct URL - {mac_name}',
+                        'direct_access': True
+                    })
+            
+            # Add general Medicare direct URLs
+            for url in DIRECT_POLICY_URLS[:5]:  # Limit to top 5
+                direct_documents.append({
+                    'title': 'Medicare Coverage Database',
+                    'url': url,
+                    'snippet': f'Medicare coverage policy for {cpt_code}',
+                    'relevance': 80,
+                    'type': 'policy_document',
+                    'source': 'Direct URL - CMS',
+                    'direct_access': True
+                })
+        
+        elif is_medicaid:
+            # Add Medicaid direct URLs
+            medicaid_state = None
+            for state, medicaid_info in MEDICAID_POLICY_URLS.items():
+                if any(state_term in insurance_provider.lower() for state_term in [state, medicaid_info["provider_name"].lower()]):
+                    medicaid_state = state
+                    break
+            
+            if medicaid_state and medicaid_state in MEDICAID_POLICY_URLS:
+                medicaid_info = MEDICAID_POLICY_URLS[medicaid_state]
+                if "policy_urls" in medicaid_info:
+                    policy_urls = medicaid_info["policy_urls"]
+                    
+                    if "genetic_testing" in policy_urls:
+                        direct_documents.append({
+                            'title': f'{medicaid_info["provider_name"]} Genetic Testing Policy',
+                            'url': policy_urls['genetic_testing'],
+                            'snippet': f'{medicaid_info["provider_name"]} genetic testing policy for {cpt_code}',
+                            'relevance': 95,
+                            'type': 'policy_document',
+                            'source': f'Direct URL - {medicaid_info["provider_name"]}',
+                            'direct_access': True
+                        })
+                    
+                    if "lab_benefits" in policy_urls:
+                        direct_documents.append({
+                            'title': f'{medicaid_info["provider_name"]} Laboratory Benefits Grid',
+                            'url': policy_urls['lab_benefits'],
+                            'snippet': f'{medicaid_info["provider_name"]} laboratory benefits and prior authorization requirements',
+                            'relevance': 90,
+                            'type': 'policy_document',
+                            'source': f'Direct URL - {medicaid_info["provider_name"]}',
+                            'direct_access': True
+                        })
+                    
+                    if "physician_benefits" in policy_urls:
+                        direct_documents.append({
+                            'title': f'{medicaid_info["provider_name"]} Physician Benefits Grid',
+                            'url': policy_urls['physician_benefits'],
+                            'snippet': f'{medicaid_info["provider_name"]} physician benefits and coverage requirements',
+                            'relevance': 85,
+                            'type': 'policy_document',
+                            'source': f'Direct URL - {medicaid_info["provider_name"]}',
+                            'direct_access': True
+                        })
+        
+        print(f"📄 Found {len(direct_documents)} direct policy documents for {cpt_code}")
+        return direct_documents
+    
+    def get_medicaid_info(self, insurance_provider: str) -> Optional[Dict]:
+        """
+        Get Medicaid program information and contact details.
+        
+        Args:
+            insurance_provider: Name of insurance provider
+            
+        Returns:
+            Medicaid information dictionary or None if not found
+        """
+        for state, medicaid_info in MEDICAID_POLICY_URLS.items():
+            if any(state_term in insurance_provider.lower() for state_term in [state, medicaid_info["provider_name"].lower()]):
+                return {
+                    "state": state,
+                    "provider_name": medicaid_info["provider_name"],
+                    "authorization_phone": medicaid_info["authorization_phone"],
+                    "authorization_fax": medicaid_info["authorization_fax"],
+                    "member_services": medicaid_info["member_services"],
+                    "website": medicaid_info["website"],
+                    "policy_urls": medicaid_info.get("policy_urls", {})
+                }
+        return None
 
 # Global instance
 enhanced_insurance_analyzer = EnhancedInsuranceAnalysis()
@@ -1997,8 +2133,13 @@ async def run_automation_workflow(auth_id: str, auth_data: dict, background_task
         
         # Update progress
         background_tasks[auth_id]['progress'] = 20
-        background_tasks[auth_id]['message'] = 'Generating search queries...'
+        background_tasks[auth_id]['message'] = 'Fetching direct policy documents and generating search queries...'
         background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Get direct policy documents and generate search queries
+        direct_documents = await enhanced_insurance_analyzer._fetch_direct_policy_documents(
+            cpt_code, insurance_provider, service_type, mac_jurisdiction
+        )
         
         # Generate search queries
         search_queries = enhanced_insurance_analyzer._generate_medicare_search_queries(
@@ -2010,13 +2151,13 @@ async def run_automation_workflow(auth_id: str, auth_data: dict, background_task
         
         # Update progress
         background_tasks[auth_id]['progress'] = 30
-        background_tasks[auth_id]['message'] = f'Running {len(important_queries)} searches...'
+        background_tasks[auth_id]['message'] = f'Running {len(important_queries)} searches with {len(direct_documents)} direct documents...'
         background_tasks[auth_id]['last_update'] = datetime.now()
         
         # Run searches in parallel
-        background_tasks[auth_id]['message'] = f'Running {len(important_queries)} searches in parallel...'
+        background_tasks[auth_id]['message'] = f'Running {len(important_queries)} searches in parallel with direct document access...'
         background_tasks[auth_id]['last_update'] = datetime.now()
-        automation_details[auth_id]['current_activity'] = f'Running {len(important_queries)} parallel searches'
+        automation_details[auth_id]['current_activity'] = f'Running {len(important_queries)} parallel searches with direct document access'
         
         # Create search tasks for parallel execution
         search_tasks = []
@@ -2030,6 +2171,8 @@ async def run_automation_workflow(auth_id: str, auth_data: dict, background_task
             
             # Process results, handling any exceptions
             all_search_results = []
+            all_search_results.extend(direct_documents)  # Add direct documents first
+            
             for i, result in enumerate(search_results_list):
                 if isinstance(result, Exception):
                     print(f"❌ Error searching for query '{important_queries[i]}': {result}")
@@ -2058,7 +2201,7 @@ async def run_automation_workflow(auth_id: str, auth_data: dict, background_task
         except Exception as e:
             print(f"❌ Error in parallel search execution: {e}")
             # Fallback to sequential search if parallel fails
-            all_search_results = []
+            all_search_results = direct_documents  # Start with direct documents
             for query in important_queries:
                 try:
                     search_results = await enhanced_insurance_analyzer._gpt_search(None, query)
