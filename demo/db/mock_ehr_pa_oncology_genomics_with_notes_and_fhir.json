@@ -352,8 +352,8 @@
       }
     },
     "coverage": {
-      "payer": "UnitedHealthcare",
-      "plan_type": "Medicare Advantage PPO",
+      "payer": "HUSKY Health",
+      "plan_type": "Medicaid",
       "member_id": "1440801160",
       "group_id": "37552",
       "effective_start": "2024-04-18",

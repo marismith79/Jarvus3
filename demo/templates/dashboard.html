@@ -218,8 +218,12 @@
                 Case Details
             </button>
             <button class="modal-tab" data-tab="automation" onclick="switchModalTab('automation')">
-                <i class="fas fa-cogs"></i>
-                Automation Progress
+                <i class="fas fa-shield-alt"></i>
+                Insurance Processing
+            </button>
+            <button class="modal-tab" data-tab="form-processing" onclick="switchModalTab('form-processing')">
+                <i class="fas fa-file-medical"></i>
+                Form Processing
             </button>
         </div>
         
@@ -272,6 +276,61 @@
                         <div class="content-container" id="step-content-container">
                             <!-- Content will be dynamically populated -->
                         </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Form Processing Tab -->
+            <div class="tab-content" id="form-processing-tab">
+                <div class="form-processing-container">
+                    <div class="form-header">
+                        <h3>HUSKY Health Program Genetic Testing Prior Authorization Request Form</h3>
+                        <!-- <p class="form-subtitle">All questions from the genetic testing form are shown below. The agent will populate answers in real-time as it processes each question.</p> -->
+                        
+                        <div class="processing-status">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="form-progress-fill" style="width: 0%"></div>
+                            </div>
+                            <div class="status-text" id="form-status-text">Initializing question processor...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-questions-container" id="form-questions-container">
+                        <!-- Questions will be loaded here -->
+                    </div>
+                    
+                    <div class="processing-summary" id="form-processing-summary">
+                        <div class="summary-item">
+                            <i class="fas fa-tasks"></i>
+                            <span>Total Questions: <span id="total-questions">0</span></span>
+                        </div>
+                        <div class="summary-item">
+                            <i class="fas fa-clock"></i>
+                            <span>Processing Time: <span id="processing-time">Calculating...</span></span>
+                        </div>
+                        <div class="summary-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Completed: <span id="completed-questions">0</span>/<span id="total-questions-display">0</span></span>
+                        </div>
+                        <div class="summary-item">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span>Missing Data: <span id="missing-data">0</span></span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button class="btn btn-primary" id="start-agent-btn" onclick="startFormAgentProcessing()">
+                            <i class="fas fa-play"></i> Start Agent Processing
+                        </button>
+                        <button class="btn btn-success" id="save-form-btn" onclick="saveFormData()" style="display: none;">
+                            <i class="fas fa-save"></i> Save Form Data
+                        </button>
+                        <button class="btn btn-info" id="export-form-btn" onclick="exportForm()" style="display: none;">
+                            <i class="fas fa-download"></i> Export Form
+                        </button>
+                        <button class="btn btn-outline-secondary" id="auto-scroll-toggle" onclick="toggleAutoScroll()" title="Toggle auto-scroll">
+                            <i class="fas fa-arrow-down"></i> Auto-scroll
+                        </button>
                     </div>
                 </div>
             </div>

@@ -1,0 +1,111 @@
+{
+  "form_title": "HUSKY Health Program Genetic Testing Prior Authorization Request Form",
+  "version": "Updated 07/19  POPPR-FM61614-0619",
+  "notes": [
+    "This form MUST be completed and signed by the ORDERING PROVIDER and sent with clinical documentation to the laboratory performing the testing. The laboratory must then fax the form and clinical documentation to 203.265.3994.",
+    "Requests for testing panels including, but not limited to, multiple genes or multiple conditions, and in cases where a tiered approach/ method is clinically available, are covered only for the number of genes or tests deemed medically necessary to establish a diagnosis."
+  ],
+  "sections": [
+    {
+      "section": "Requested Testing",
+      "questions": [
+        {
+          "id": "1",
+          "text": "Is the testing being ordered by a physician, advanced practice registered nurse (APRN), or certified nurse midwife (CNM) with expertise in clinical genetics or in the treatment of the targeted disease? If no, please explain:"
+        },
+        {
+          "id": "2",
+          "text": "Will genetic counseling be performed prior to and post-testing? If no, please explain:"
+        },
+        {
+          "id": "3",
+          "text": "Has a specific mutation or set of mutations been identified and broadly accepted by credible medical societies to be reliably associated with the condition or defect?"
+        },
+        {
+          "id": "4",
+          "text": "Can the genetic disorder be diagnosed or ruled out through means other than genetic testing (e.g., clinical examination, imaging, laboratory testing, or other testing)? If yes, please describe:"
+        },
+        {
+          "id": "5",
+          "text": "Has this test been performed previously? If yes, please explain why repeat testing is medically necessary:"
+        },
+        {
+          "id": "6",
+          "text": "What is the specific reason why the requested genetic test is being ordered for the individual? As part of this explanation, please include the algorithm/evidence-based clinical guidelines that were used to aid in your decision making (e.g., NCCN Guidelines®)."
+        },
+        {
+          "id": "7",
+          "text": "List all examinations, laboratory tests, imaging, and diagnostic studies that have been performed as part of the evaluation of the individual. Please attach results."
+        }
+      ]
+    },
+    {
+      "section": "Clinical Presentation",
+      "questions": [
+        {
+          "id": "1",
+          "text": "Does the individual exhibit clinical features of the mutation in question? If yes, please attach medical record documentation."
+        },
+        {
+          "id": "2",
+          "text": "Is the individual at direct risk of inheriting a genetic mutation? If yes, please attach medical record documentation."
+        },
+        {
+          "id": "3",
+          "text": "Is the individual a prospective parent and the fetus would be at high risk for a specific inheritable disease or defect and outcome of testing is required to determine carrier status of inherited disorders and to guide subsequent reproductive decisions? If yes, please attach medical record documentation."
+        }
+      ]
+    },
+    {
+      "section": "History",
+      "questions": [
+        {
+          "id": "1",
+          "text": "Has less intensive genetic testing been completed? If yes, list previous testing below and attach results."
+        },
+        {
+          "id": "2",
+          "text": "Is there a personal history of this diagnosis? If yes, list history of related diagnoses/disorders:"
+        },
+        {
+          "id": "3",
+          "text": "Is there a family history of this diagnosis or related disorders? If yes, list history of related diagnoses/disorders below."
+        },
+        {
+          "id": "4",
+          "text": "Does spouse/reproductive partner have a history of known disorder, related disorder, or family mutation? If yes, please describe:"
+        },
+        {
+          "id": "5",
+          "text": "Does a previous child have a history of known disorder, related disorder, or family mutation? If yes, please describe:"
+        }
+      ]
+    },
+    {
+      "section": "Medical Management",
+      "questions": [
+        {
+          "id": "1",
+          "text": "Will test results have a material impact on the treatment plan and lead to interventions and surveillance beyond what is typically recommended for individuals without the genetic mutation? If yes, please describe:"
+        },
+        {
+          "id": "2",
+          "text": "Will test results improve health outcomes for the individual? If yes, please describe:"
+        },
+        {
+          "id": "3",
+          "text": "Is the disease treatable or preventable? If yes, please describe:"
+        },
+        {
+          "id": "4",
+          "text": "Will the change in medical management result in a reduced risk of morbidity and/or mortality?"
+        },
+        {
+          "id": "5",
+          "text": "Will the testing avoid or supplant additional testing? If yes, please describe:"
+        }
+      ]
+    }
+  ],
+  "footer_note": "Review criteria are used as guidelines only. Determinations are based on a person-centered assessment of the individual and their unique clinical needs. Additional information submitted with this request will be considered as part of the medical necessity review process, in accordance with Conn. Gen. Stat. Sec. 17b-259b."
+}

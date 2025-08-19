@@ -1,0 +1,387 @@
+{
+  "title": "HUSKY Health Program Genetic Testing",
+  "form_id": "POPPR-FM61614-0619",
+  "version": "07/19",
+  "sections": [
+    {
+      "section_name": "General Information",
+      "questions": [
+        {
+          "id": "q1",
+          "question": "Please list all CPT codes with requested units.",
+          "type": "text_area",
+          "required": true,
+          "placeholder": "Enter CPT codes and units..."
+        },
+        {
+          "id": "q2",
+          "question": "Is the ordering provider a board-certified geneticist, genetic counselor, or certified nurse midwife (CNM) with expertise in clinical genetics or in the treatment of the targeted disease?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "No",
+            "question": "If no, please explain:",
+            "type": "text_area"
+          }
+        },
+        {
+          "id": "q3",
+          "question": "Will genetic counseling be performed prior to and post-testing?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "No",
+            "question": "If no, please explain:",
+            "type": "text_area"
+          }
+        },
+        {
+          "id": "q4",
+          "question": "Is the genetic test reliably associated with the condition or defect?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true
+        },
+        {
+          "id": "q5",
+          "question": "Are there any other diagnostic studies available (imaging, laboratory testing, or other testing)?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "If yes, please describe:",
+            "type": "text_area"
+          }
+        },
+        {
+          "id": "q6",
+          "question": "Has this test been performed previously?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "If yes, please explain why repeat testing is medically necessary:",
+            "type": "text_area"
+          }
+        },
+        {
+          "id": "q7",
+          "question": "What is the specific reason why the requested genetic test is being ordered for the individual?",
+          "type": "text_area",
+          "required": true,
+          "placeholder": "Please provide detailed explanation..."
+        },
+        {
+          "id": "q8",
+          "question": "List all examinations, laboratory tests, imaging, and diagnostic studies that have been performed as part of the evaluation of the individual. Please attach results.",
+          "type": "text_area",
+          "required": true,
+          "placeholder": "List all tests and studies performed..."
+        }
+      ]
+    },
+    {
+      "section_name": "Clinical Presentation",
+      "questions": [
+        {
+          "id": "cp1",
+          "question": "Does the individual exhibit clinical features of the mutation in question?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "Please attach medical record documentation.",
+            "type": "file_upload"
+          }
+        },
+        {
+          "id": "cp2",
+          "question": "Is the individual at direct risk of inheriting a genetic mutation?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "Please attach medical record documentation.",
+            "type": "file_upload"
+          }
+        },
+        {
+          "id": "cp3",
+          "question": "Is the individual a prospective parent and the fetus would be at high risk for a specific inheritable disease or defect and outcome of testing is required to determine carrier status of inherited disorders and to guide subsequent reproductive decisions?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "Please attach medical record documentation.",
+            "type": "file_upload"
+          }
+        }
+      ]
+    },
+    {
+      "section_name": "History",
+      "questions": [
+        {
+          "id": "h1",
+          "question": "Has less intensive genetic testing been completed?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "List previous testing below and attach results:",
+            "type": "table",
+            "columns": ["Test", "Date of Testing", "Mutation Identified?", "Specific Mutation Identified"],
+            "rows": 3
+          }
+        },
+        {
+          "id": "h2",
+          "question": "Is there a personal history of this diagnosis?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "List history of related diagnoses/disorders:",
+            "type": "table",
+            "columns": ["Diagnosis", "Age at Time of Diagnosis"],
+            "rows": 3
+          }
+        },
+        {
+          "id": "h3",
+          "question": "Is there a family history of this diagnosis or related disorders?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "List history of related diagnoses/disorders below:",
+            "type": "table",
+            "columns": ["Relationship", "Maternal/Paternal", "Diagnosis", "Age at Time of Diagnosis", "Family Member Deceased?", "Was Genetic Testing Completed?", "Family Mutation (If known)?"],
+            "rows": 4
+          }
+        },
+        {
+          "id": "h4",
+          "question": "Does spouse/reproductive partner have a history of known disorder, related disorder, or family mutation?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "Please describe:",
+            "type": "text_area"
+          }
+        },
+        {
+          "id": "h5",
+          "question": "Does a previous child have a history of known disorder, related disorder, or family mutation?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "Please describe:",
+            "type": "text_area"
+          }
+        }
+      ]
+    },
+    {
+      "section_name": "Medical Management",
+      "questions": [
+        {
+          "id": "mm1",
+          "question": "Will test results have a material impact on the treatment plan and lead to interventions and surveillance beyond what is typically recommended for individuals without the genetic mutation?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "Please describe:",
+            "type": "text_area"
+          }
+        },
+        {
+          "id": "mm2",
+          "question": "Will test results improve health outcomes for the individual?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "Please describe:",
+            "type": "text_area"
+          }
+        },
+        {
+          "id": "mm3",
+          "question": "Is the disease treatable or preventable?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "Please describe:",
+            "type": "text_area"
+          }
+        },
+        {
+          "id": "mm4",
+          "question": "Will the change in medical management result in a reduced risk of morbidity and/or mortality?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true
+        },
+        {
+          "id": "mm5",
+          "question": "Will the testing avoid or supplant additional testing?",
+          "type": "radio",
+          "options": ["Yes", "No"],
+          "required": true,
+          "follow_up": {
+            "condition": "Yes",
+            "question": "Please describe:",
+            "type": "text_area"
+          }
+        }
+      ]
+    },
+    {
+      "section_name": "Provider Information",
+      "questions": [
+        {
+          "id": "billing",
+          "subsection": "Billing Provider Information",
+          "fields": [
+            {
+              "id": "billing_medicaid",
+              "label": "Medicaid Billing Number:",
+              "type": "text",
+              "required": true
+            },
+            {
+              "id": "billing_name",
+              "label": "Billing Provider Name:",
+              "type": "text",
+              "required": true
+            },
+            {
+              "id": "billing_address",
+              "label": "Street Address:",
+              "type": "text",
+              "required": true
+            },
+            {
+              "id": "billing_city_state_zip",
+              "label": "City, State, Zip:",
+              "type": "text",
+              "required": true
+            },
+            {
+              "id": "billing_phone",
+              "label": "Phone #:",
+              "type": "tel",
+              "required": true
+            },
+            {
+              "id": "billing_fax",
+              "label": "Fax #:",
+              "type": "tel"
+            },
+            {
+              "id": "billing_contact",
+              "label": "Contact Name:",
+              "type": "text",
+              "required": true
+            }
+          ]
+        },
+        {
+          "id": "ordering",
+          "subsection": "Ordering Provider Information",
+          "fields": [
+            {
+              "id": "ordering_medicaid",
+              "label": "Medicaid Billing Number:",
+              "type": "text",
+              "required": true
+            },
+            {
+              "id": "ordering_name",
+              "label": "Ordering Provider Name:",
+              "type": "text",
+              "required": true
+            },
+            {
+              "id": "ordering_address",
+              "label": "Street Address:",
+              "type": "text",
+              "required": true
+            },
+            {
+              "id": "ordering_city_state_zip",
+              "label": "City, State, Zip:",
+              "type": "text",
+              "required": true
+            },
+            {
+              "id": "ordering_phone",
+              "label": "Phone #:",
+              "type": "tel",
+              "required": true
+            },
+            {
+              "id": "ordering_fax",
+              "label": "Fax #:",
+              "type": "tel"
+            },
+            {
+              "id": "ordering_contact",
+              "label": "Contact Name:",
+              "type": "text",
+              "required": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "section_name": "Certification",
+      "questions": [
+        {
+          "id": "certification_statement",
+          "question": "Certification Statement:",
+          "type": "statement",
+          "content": "This is to certify that the requested testing is medically indicated and is reasonable and necessary for the treatment of this patient and that a prescribing practitioner signed order is on file. This form and any statement on my letterhead attached hereto has been completed by me or by my employee and reviewed by me. The foregoing information is true, accurate and complete, and I understand that any falsification, omission, or concealment of material fact may subject me to civil and criminal liability.",
+          "required": true
+        },
+        {
+          "id": "physician_signature",
+          "question": "Physician Signature:",
+          "type": "signature",
+          "required": true
+        },
+        {
+          "id": "signature_date",
+          "question": "Date:",
+          "type": "date",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Review criteria are used as guidelines only. Determinations are based on a person-centered assessment of the individual and their unique clinical needs.",
+    "Additional information submitted with this request will be considered as part of the medical necessity review process, in accordance with Conn. Gen. Stat. Sec. 17b-259b."
+  ]
+}

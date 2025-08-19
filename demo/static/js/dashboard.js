@@ -23,12 +23,56 @@ const automationSteps = [
     },
     {
         id: 2,
-        title: "Form Completion with EHR Data Extraction",
-        description: "Filling form using policy analysis and extracting EHR data",
+        title: "Form Processing",
+        description: "Processing form questions and extracting EHR data",
         icon: "fas fa-file-medical",
         content: "form"
     }
 ];
+
+// Auto-scroll configuration
+let autoScrollEnabled = true;
+let lastScrollTime = 0;
+const SCROLL_THROTTLE_MS = 500; // Minimum time between scrolls
+
+// Auto-scroll utility function
+function autoScrollToElement(element, options = {}) {
+    if (!autoScrollEnabled || !element) return;
+    
+    const now = Date.now();
+    if (now - lastScrollTime < SCROLL_THROTTLE_MS) return;
+    
+    lastScrollTime = now;
+    
+    const defaultOptions = {
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest',
+        delay: 200
+    };
+    
+    const scrollOptions = { ...defaultOptions, ...options };
+    
+    setTimeout(() => {
+        element.scrollIntoView(scrollOptions);
+    }, scrollOptions.delay);
+}
+
+// Toggle auto-scroll function
+function toggleAutoScroll() {
+    autoScrollEnabled = !autoScrollEnabled;
+    const toggleBtn = document.getElementById('auto-scroll-toggle');
+    
+    if (autoScrollEnabled) {
+        toggleBtn.innerHTML = '<i class="fas fa-arrow-down"></i> Auto-scroll';
+        toggleBtn.className = 'btn btn-outline-secondary';
+        toggleBtn.title = 'Disable auto-scroll';
+    } else {
+        toggleBtn.innerHTML = '<i class="fas fa-times"></i> Auto-scroll';
+        toggleBtn.className = 'btn btn-outline-danger';
+        toggleBtn.title = 'Enable auto-scroll';
+    }
+}
 
 // Load data on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -605,6 +649,52 @@ async function pollAutomationStatus(authId) {
         // Update UI with current status
         updateAutomationUI(status);
         
+        // Also check the case status from the database
+        let caseStatus = null;
+        try {
+            const caseResponse = await fetch(`/api/prior-auths/${authId}`);
+            const caseData = await caseResponse.json();
+            if (caseData.success) {
+                caseStatus = caseData.auth.status;
+            }
+        } catch (e) {
+            console.log('Could not fetch case status:', e);
+        }
+        
+        // Check if ready for form completion (when run_automation_workflow returns True)
+        if ((status.results && status.results.form && status.results.form.status === 'ready_for_completion') || 
+            (status.details && status.details.get('ready_for_form') === true) ||
+            (status.message && status.message.includes('Ready for form completion')) ||
+            (caseStatus === 'ready_for_form')) {
+            console.log('🔄 Coverage analysis complete, switching to form processing tab');
+            
+            // Update the current step status to show transition
+            const currentStepStatus = document.getElementById('current-step-status');
+            if (currentStepStatus) {
+                currentStepStatus.innerHTML = '<i class="fas fa-arrow-right"></i> Transitioning to Form Processing';
+            }
+            
+            // Update progress text to show transition
+            const progressText = document.getElementById('automation-progress-text');
+            if (progressText) {
+                progressText.textContent = 'Coverage analysis complete - switching to form processing...';
+            }
+            
+            // Stop polling for automation updates
+            stopAutomationPolling();
+            
+            // Switch to form processing tab
+            switchModalTab('form-processing');
+            
+            // Wait a moment for the tab to load, then start form agent processing
+            setTimeout(() => {
+                console.log('🚀 Starting form agent processing automatically');
+                startFormAgentProcessing();
+            }, 1000);
+            
+            return;
+        }
+        
         // Check if automation is complete
         if (!status.is_running) {
             stopAutomationPolling();
@@ -630,19 +720,19 @@ async function pollAutomationStatus(authId) {
                     }
                 }
                 
-                // Add completion message to the detailed content
-                const contentContainer = document.getElementById('step-content-container');
-                if (contentContainer) {
-                    const completionMessage = document.createElement('div');
-                    completionMessage.className = 'completion-message';
-                    completionMessage.innerHTML = `
-                        <div class="completion-banner">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Automation completed successfully!</span>
-                        </div>
-                    `;
-                    contentContainer.insertBefore(completionMessage, contentContainer.firstChild);
-                }
+                // // Add completion message to the detailed content
+                // const contentContainer = document.getElementById('step-content-container');
+                // if (contentContainer) {
+                //     const completionMessage = document.createElement('div');
+                //     completionMessage.className = 'completion-message';
+                //     completionMessage.innerHTML = `
+                //         <div class="completion-banner">
+                //             <i class="fas fa-check-circle"></i>
+                //             <span>Automation completed successfully!</span>
+                //         </div>
+                //     `;
+                //     contentContainer.insertBefore(completionMessage, contentContainer.firstChild);
+                // }
             }
         }
         
@@ -728,18 +818,16 @@ function updateDetailedContent(status) {
     const details = status.details;
     let contentHtml = '';
     
-    // Show current activity
+    // Show current activity directly under progress bar
     if (details.current_activity) {
         const isRunning = status.is_running !== false; // Default to true if not explicitly false
         const iconClass = isRunning ? 'fas fa-cog fa-spin' : 'fas fa-check-circle';
-        const title = isRunning ? 'Current Activity' : 'Last Activity';
         
-        contentHtml += `
-            <div class="current-activity">
-                <h5><i class="${iconClass}"></i> ${title}</h5>
-                <p>${details.current_activity}</p>
-            </div>
-        `;
+        // Update the progress text to show current activity
+        const progressText = document.getElementById('automation-progress-text');
+        if (progressText) {
+            progressText.textContent = details.current_activity;
+        }
     }
     
     // Track which sections to show expanded (current step) vs collapsed (previous steps)
@@ -750,7 +838,7 @@ function updateDetailedContent(status) {
     if (details.search_results && details.search_results.length > 0) {
         sectionCount++;
         const isCurrentStep = currentStep === 1;
-        const isExpanded = isCurrentStep || status.is_running === false;
+        const isExpanded = isCurrentStep; // Only expand if it's the current step
         
         contentHtml += `
             <div class="collapsible-section ${isExpanded ? 'expanded' : 'collapsed'}" data-section="search-results">
@@ -807,7 +895,7 @@ function updateDetailedContent(status) {
     if (details.parsing_agent_results) {
         sectionCount++;
         const isCurrentStep = currentStep === 1; // Parsing agent runs as part of step 1
-        const isExpanded = isCurrentStep || status.is_running === false;
+        const isExpanded = isCurrentStep; // Only expand if it's the current step
         
         contentHtml += `
             <div class="collapsible-section ${isExpanded ? 'expanded' : 'collapsed'}" data-section="parsing-agent">
@@ -877,7 +965,7 @@ function updateDetailedContent(status) {
     if (details.form_data && Object.keys(details.form_data).length > 0) {
         sectionCount++;
         const isCurrentStep = currentStep === 2;
-        const isExpanded = isCurrentStep || status.is_running === false;
+        const isExpanded = isCurrentStep; // Only expand if it's the current step
         
         contentHtml += `
             <div class="collapsible-section ${isExpanded ? 'expanded' : 'collapsed'}" data-section="form-data">
@@ -934,7 +1022,7 @@ function updateDetailedContent(status) {
                     <h6>Validation</h6>
                     <div class="validation-status ${details.form_data.validation.status}">
                         <i class="fas fa-${details.form_data.validation.status === 'valid' ? 'check-circle' : 'exclamation-triangle'}"></i>
-                        <span>${details.form_data.validation.status.toUpperCase()}</span>
+                        <span>${details.form_data.status.toUpperCase()}</span>
                     </div>
                     ${details.form_data.validation.errors.length > 0 ? `
                         <div class="validation-errors">
@@ -1647,14 +1735,128 @@ function showCompleteAnalysis() {
 async function executeFormCompletionWithEHR() {
     const content = document.getElementById('step-content-container');
     
-    // Show form completion animation
-    showFormCompletionAnimation();
-    updateFormQuery("🚀 Starting form completion with EHR data extraction...");
-    updateFormProgress(0);
+    // Clear the content area - no need for the form completion box
+    content.innerHTML = '';
+    
+    // Automatically switch to form processing tab after a short delay
+    setTimeout(() => {
+        switchModalTab('form-processing');
+    }, 2000);
+}
+
+
+
+async function loadFormQuestions() {
+    const container = document.getElementById('form-questions-container');
+    const totalQuestionsSpan = document.getElementById('total-questions');
+    const totalQuestionsDisplaySpan = document.getElementById('total-questions-display');
     
     try {
-        // Start the streaming form completion process
-        const response = await fetch(`/api/prior-auths/${automationData.id}/form-completion-stream`, {
+        // Load questions from API
+        const response = await fetch('/api/form-questions');
+        const data = await response.json();
+        
+        if (data.success) {
+            const formQuestions = data.form_questions;
+            const totalQuestions = data.total_questions;
+            
+            // Update total questions count
+            totalQuestionsSpan.textContent = totalQuestions;
+            totalQuestionsDisplaySpan.textContent = totalQuestions;
+            
+            // Generate HTML for all questions
+            let questionsHTML = '';
+            
+            for (const section of formQuestions.sections) {
+                questionsHTML += `
+                    <div class="question-sections">
+                        <div class="section-header">
+                            <h6><i class="fas fa-list"></i> ${section.section_name}</h6>
+                            <div class="section-progress">${section.questions.length} questions</div>
+                        </div>
+                        <div class="question-list">
+                `;
+                
+                for (const question of section.questions) {
+                    const questionId = question.id;
+                    const questionText = question.question;
+                    const questionType = question.type;
+                    const isRequired = question.required;
+                    
+                    let fieldHTML = '';
+                    if (questionType === 'radio' && question.options) {
+                        fieldHTML = `
+                            <select class="answer-field" data-field-id="${questionId}">
+                                <option value="">Agent will populate this answer...</option>
+                                ${question.options.map(option => `<option value="${option}">${option}</option>`).join('')}
+                            </select>
+                        `;
+                    } else if (questionType === 'text_area') {
+                        fieldHTML = `
+                            <textarea class="answer-field" placeholder="Agent will populate this answer..." data-field-id="${questionId}"></textarea>
+                        `;
+                    } else {
+                        fieldHTML = `
+                            <input type="text" class="answer-field" placeholder="Agent will populate this answer..." data-field-id="${questionId}">
+                        `;
+                    }
+                    
+                    questionsHTML += `
+                        <div class="question-item" data-question-id="${questionId}">
+                            <div class="question-text">${questionText}${isRequired ? ' <span class="required">*</span>' : ''}</div>
+                            <div class="answer-container">
+                                ${fieldHTML}
+                                <div class="answer-status">
+                                    <i class="fas fa-clock"></i>
+                                    <span>Waiting for agent...</span>
+                                </div>
+                                <div class="answer-source"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                questionsHTML += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = questionsHTML;
+            
+            // Add event listeners for editable fields
+            addFieldEditListeners();
+            
+            // Update status
+            document.getElementById('form-status-text').textContent = 'Form loaded. Ready to start agent processing.';
+            
+        } else {
+            container.innerHTML = `<div class="error-message">Error loading form questions: ${data.error}</div>`;
+        }
+    } catch (error) {
+        console.error('Error loading form questions:', error);
+        container.innerHTML = `<div class="error-message">Error loading form questions: ${error.message}</div>`;
+    }
+}
+
+async function startFormAgentProcessing() {
+    const progressFill = document.getElementById('form-progress-fill');
+    const statusText = document.getElementById('form-status-text');
+    const completedQuestionsSpan = document.getElementById('completed-questions');
+    const processingTimeSpan = document.getElementById('processing-time');
+    const startBtn = document.getElementById('start-agent-btn');
+    const saveBtn = document.getElementById('save-form-btn');
+    const exportBtn = document.getElementById('export-form-btn');
+    
+    // Disable start button and show processing state
+    startBtn.disabled = true;
+    startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    
+    const startTime = Date.now();
+    let completedCount = 0;
+    
+    try {
+        const response = await fetch(`/api/prior-auths/${automationData.id}/process-questions-realtime`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1682,166 +1884,121 @@ async function executeFormCompletionWithEHR() {
                         
                         switch (data.type) {
                             case 'status':
-                                updateFormQuery(data.message);
-                                updateFormProgress(data.progress);
+                                statusText.textContent = data.message;
+                                progressFill.style.width = data.progress + '%';
                                 break;
                                 
-                            case 'ehr_extraction':
-                                updateFormQuery(`📋 Extracting: ${data.field} from EHR`);
-                                updateFormProgress(data.progress);
+                            case 'section_start':
+                                statusText.textContent = `Processing ${data.section} section...`;
+                                progressFill.style.width = data.progress + '%';
                                 
-                                // Show EHR extraction results
-                                const ehrContainer = document.createElement('div');
-                                ehrContainer.className = 'ehr-extraction-container';
-                                ehrContainer.innerHTML = `
-                                    <h5>📋 EHR Data Extraction: ${data.field}</h5>
-                                    <div class="ehr-result">
-                                        <div class="ehr-value">${data.value}</div>
-                                        <div class="ehr-source">Source: ${data.source}</div>
-                                        <div class="ehr-citation">Citation: ${data.citation}</div>
-                                    </div>
-                                `;
-                                
-                                const contentArea = document.getElementById('step-content-container');
-                                contentArea.appendChild(ehrContainer);
+                                // Auto-scroll to the first question of the new section
+                                const firstQuestionOfSection = document.querySelector(`[data-question-id]`);
+                                autoScrollToElement(firstQuestionOfSection, { 
+                                    block: 'start',
+                                    delay: 100 
+                                });
                                 break;
                                 
-                            case 'form_field':
-                                updateFormQuery(`📝 Filling form field: ${data.field}`);
-                                updateFormProgress(data.progress);
+                            case 'question_start':
+                                // Update question status to processing
+                                const questionItem = document.querySelector(`[data-question-id="${data.question_id}"]`);
+                                if (questionItem) {
+                                    const statusDiv = questionItem.querySelector('.answer-status');
+                                    statusDiv.innerHTML = `
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                        <span>Agent processing...</span>
+                                    `;
+                                    statusDiv.className = 'answer-status processing';
+                                    
+                                    // Auto-scroll to the question being processed
+                                    autoScrollToElement(questionItem, { delay: 200 });
+                                }
+                                break;
                                 
-                                // Show form field completion
-                                const formContainer = document.createElement('div');
-                                formContainer.className = 'form-field-container';
-                                formContainer.innerHTML = `
-                                    <h5>📝 Form Field: ${data.field}</h5>
-                                    <div class="form-field-result">
-                                        <div class="field-value">${data.value}</div>
-                                        <div class="field-justification">${data.justification}</div>
-                                        <div class="field-sources">Sources: ${data.sources.join(', ')}</div>
-                                    </div>
-                                `;
+                            case 'question_result':
+                                // Update question with result
+                                const resultItem = document.querySelector(`[data-question-id="${data.question_id}"]`);
+                                if (resultItem) {
+                                    const answerField = resultItem.querySelector('.answer-field');
+                                    const statusDiv = resultItem.querySelector('.answer-status');
+                                    const sourceDiv = resultItem.querySelector('.answer-source');
+                                    
+                                    // Populate answer
+                                    if (answerField.tagName === 'SELECT') {
+                                        answerField.value = data.answer || '';
+                                    } else {
+                                        answerField.value = data.answer || '';
+                                    }
+                                    
+                                    // Update status
+                                    if (data.status === 'completed') {
+                                        statusDiv.innerHTML = `
+                                            <i class="fas fa-check-circle text-success"></i>
+                                            <span>Agent completed</span>
+                                        `;
+                                        statusDiv.className = 'answer-status completed';
+                                        completedCount++;
+                                        completedQuestionsSpan.textContent = completedCount;
+                                    } else {
+                                        statusDiv.innerHTML = `
+                                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                                            <span>${data.status}</span>
+                                        `;
+                                        statusDiv.className = 'answer-status error';
+                                    }
+                                    
+                                    // Show source
+                                    if (data.source) {
+                                        sourceDiv.innerHTML = `<small>Source: ${data.source}</small>`;
+                                        sourceDiv.className = 'answer-source populated';
+                                    }
+                                    
+                                    // Auto-scroll to the completed question
+                                    autoScrollToElement(resultItem, { delay: 300 });
+                                }
+                                break;
                                 
-                                const contentArea2 = document.getElementById('step-content-container');
-                                contentArea2.appendChild(formContainer);
+                            case 'section_complete':
+                                statusText.textContent = `Completed ${data.section} section`;
+                                progressFill.style.width = data.progress + '%';
                                 break;
                                 
                             case 'complete':
-                                // Hide animation and show final form
-                                hideFormCompletionAnimation();
+                                const endTime = Date.now();
+                                const processingTime = ((endTime - startTime) / 1000).toFixed(1);
                                 
-                                // Display the completed form
-                                const formResult = data.result;
+                                statusText.textContent = 'Agent processing complete! All questions populated.';
+                                progressFill.style.width = data.progress + '%';
+                                processingTimeSpan.textContent = `${processingTime}s`;
                                 
-                                content.innerHTML = `
-                                    <div class="form-completion-result">
-                                        <h4>Step 2: Form Completion with EHR Data - Complete</h4>
-                                        <div class="completed-form-card">
-                                            <div class="form-summary">
-                                                <div class="completion-status success">
-                                                    <i class="fas fa-check-circle"></i>
-                                                    <span><strong>Form Status:</strong> READY FOR HUMAN VALIDATION</span>
-                                                </div>
-                                                <div class="completion-stats">
-                                                    <strong>Fields Completed:</strong> ${formResult.completed_fields}/${formResult.total_fields}
-                                                </div>
-                                            </div>
-                                            
-                                            <div class="form-sections">
-                                                ${formResult.sections.map(section => `
-                                                    <div class="form-section">
-                                                        <h5>${section.title}</h5>
-                                                        ${section.fields.map(field => `
-                                                            <div class="form-field">
-                                                                <div class="field-label">${field.label}:</div>
-                                                                <div class="field-value">${field.value}</div>
-                                                                <div class="field-sources">
-                                                                    <strong>Data Sources:</strong> ${field.sources.join(', ')}
-                                                                </div>
-                                                            </div>
-                                                        `).join('')}
-                                                    </div>
-                                                `).join('')}
-                                            </div>
-                                            
-                                            <div class="ehr-citations">
-                                                <h5>EHR Data Citations & Sources:</h5>
-                                                <div class="citations-grid">
-                                                    ${formResult.ehr_citations.map(citation => `
-                                                        <div class="citation-item">
-                                                            <div class="citation-field"><strong>${citation.field}:</strong></div>
-                                                            <div class="citation-value">${citation.value}</div>
-                                                            <div class="citation-source">Source: ${citation.source}</div>
-                                                        </div>
-                                                    `).join('')}
-                                                </div>
-                                            </div>
-                                            
-                                            <div class="policy-references">
-                                                <h5>Supporting Policy Documents:</h5>
-                                                <div class="policy-grid">
-                                                    ${formResult.policy_references.map(ref => `
-                                                        <div class="policy-item">
-                                                            <a href="${ref.url}" target="_blank" class="policy-title">${ref.title}</a>
-                                                            <div class="policy-meta">
-                                                                <span class="relevance">${ref.relevance}% relevant</span>
-                                                                <span class="policy-type">Policy Document</span>
-                                                            </div>
-                                                        </div>
-                                                    `).join('')}
-                                                </div>
-                                            </div>
-                                            
-                                            <div class="validation-section">
-                                                <h5>Human Validation Required:</h5>
-                                                <p>Please review the completed form above. All data has been extracted from the EHR system and cross-referenced with policy requirements from Step 1.</p>
-                                                
-                                                                                            <div class="validation-actions">
-                                                <button class="btn btn-primary" onclick="openInteractiveForm()">
-                                                    <i class="fas fa-edit"></i> Interactive Form Editor
-                                                </button>
-                                                <button class="btn btn-success" onclick="approveForm()">
-                                                    <i class="fas fa-check"></i> Approve & Submit
-                                                </button>
-                                                <button class="btn btn-warning" onclick="requestFormChanges()">
-                                                    <i class="fas fa-edit"></i> Request Changes
-                                                </button>
-                                                <button class="btn btn-info" onclick="exportForm()">
-                                                    <i class="fas fa-download"></i> Export Form
-                                                </button>
-                                            </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `;
+                                // Show completion message
+                                setTimeout(() => {
+                                    const completionMessage = document.createElement('div');
+                                    completionMessage.className = 'completion-message success';
+                                    completionMessage.innerHTML = `
+                                        <i class="fas fa-check-circle"></i>
+                                        <span>All ${data.total_questions} questions processed by agent! You can now edit any answers as needed.</span>
+                                    `;
+                                    document.getElementById('form-processing-summary').appendChild(completionMessage);
+                                }, 1000);
                                 
-                                stepResults.form = {
-                                    status: 'completed',
-                                    form_completed: true,
-                                    ehr_data_integrated: true,
-                                    policy_references_included: true,
-                                    action: 'ready_for_validation'
-                                };
+                                // Enable save and export buttons
+                                saveBtn.style.display = 'inline-block';
+                                exportBtn.style.display = 'inline-block';
                                 
-                                // Add step to history
-                                addCompletedStep(2, formResult);
-                                
-                                // Don't auto-advance - wait for human validation
-                                // await moveToNextStep();
+                                // Reset start button
+                                startBtn.disabled = false;
+                                startBtn.innerHTML = '<i class="fas fa-play"></i> Start Agent Processing';
                                 return;
                                 
                             case 'error':
-                                hideFormCompletionAnimation();
-                                await streamText(content, `
-                                    <div class="error-result">
-                                        <h4>Step 2: Form Completion - Error</h4>
-                                        <div class="error-card">
-                                            <i class="fas fa-exclamation-triangle"></i>
-                                            <p><strong>Error:</strong> ${data.error}</p>
-                                            <p>Please try again or contact support.</p>
-                                        </div>
-                                    </div>
-                                `, 'form');
+                                statusText.textContent = `Error: ${data.error}`;
+                                console.error('Agent processing error:', data.error);
+                                
+                                // Reset start button
+                                startBtn.disabled = false;
+                                startBtn.innerHTML = '<i class="fas fa-play"></i> Start Agent Processing';
                                 return;
                         }
                     } catch (parseError) {
@@ -1852,18 +2009,12 @@ async function executeFormCompletionWithEHR() {
         }
         
     } catch (error) {
-        console.error('Error in form completion stream:', error);
-        hideFormCompletionAnimation();
-        await streamText(content, `
-            <div class="error-result">
-                <h4>Step 2: Form Completion - Error</h4>
-                <div class="error-card">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p><strong>Error:</strong> ${error.message}</p>
-                    <p>Please try again or contact support.</p>
-                </div>
-            </div>
-        `, 'form');
+        console.error('Error starting agent processing:', error);
+        statusText.textContent = `Error: ${error.message}`;
+        
+        // Reset start button
+        startBtn.disabled = false;
+        startBtn.innerHTML = '<i class="fas fa-play"></i> Start Agent Processing';
     }
 }
 
@@ -3092,20 +3243,25 @@ function switchModalTab(tabName) {
     const tabContents = document.querySelectorAll('.tab-content');
     tabContents.forEach(content => content.classList.remove('active'));
     
-    // Remove active class from all tabs
-    const tabs = document.querySelectorAll('.modal-tab');
-    tabs.forEach(tab => tab.classList.remove('active'));
+    // Remove active class from all tab buttons
+    const tabButtons = document.querySelectorAll('.modal-tab');
+    tabButtons.forEach(button => button.classList.remove('active'));
     
     // Show selected tab content
-    const selectedTabContent = document.getElementById(`${tabName}-tab`);
-    if (selectedTabContent) {
-        selectedTabContent.classList.add('active');
-    }
-    
-    // Add active class to selected tab
-    const selectedTab = document.querySelector(`[data-tab="${tabName}"]`);
+    const selectedTab = document.getElementById(tabName + '-tab');
     if (selectedTab) {
         selectedTab.classList.add('active');
+    }
+    
+    // Add active class to selected tab button
+    const selectedButton = document.querySelector(`[data-tab="${tabName}"]`);
+    if (selectedButton) {
+        selectedButton.classList.add('active');
+    }
+    
+    // Load form questions when the form processing tab is selected
+    if (tabName === 'form-processing') {
+        loadFormQuestions();
     }
 }
 
@@ -3129,19 +3285,19 @@ function showAutomationHistory(authId) {
                 // Show the detailed content (same as during automation)
                 updateDetailedContent(status);
                 
-                // Add completion message at the top
-                const contentContainer = document.getElementById('step-content-container');
-                if (contentContainer) {
-                    const completionMessage = document.createElement('div');
-                    completionMessage.className = 'completion-message';
-                    completionMessage.innerHTML = `
-                        <div class="completion-banner">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Automation completed successfully!</span>
-                        </div>
-                    `;
-                    contentContainer.insertBefore(completionMessage, contentContainer.firstChild);
-                }
+                // // Add completion message at the top
+                // const contentContainer = document.getElementById('step-content-container');
+                // if (contentContainer) {
+                //     const completionMessage = document.createElement('div');
+                //     completionMessage.className = 'completion-message';
+                //     completionMessage.innerHTML = `
+                //         <div class="completion-banner">
+                //             <i class="fas fa-check-circle"></i>
+                //             <span>Automation completed successfully!</span>
+                //         </div>
+                //     `;
+                //     contentContainer.insertBefore(completionMessage, contentContainer.firstChild);
+                // }
                 
                 // Update step status to show completion
                 const currentStepStatus = document.getElementById('current-step-status');
@@ -4030,4 +4186,98 @@ window.onclick = function(event) {
     if (event.target === clinicianModal) {
         closeClinicianModal();
     }
+}
+
+function addFieldEditListeners() {
+    // Add change listeners to all answer fields
+    const answerFields = document.querySelectorAll('.answer-field');
+    answerFields.forEach(field => {
+        field.addEventListener('change', function() {
+            const questionItem = this.closest('.question-item');
+            const statusDiv = questionItem.querySelector('.answer-status');
+            
+            // Update status to show user edited
+            statusDiv.innerHTML = `
+                <i class="fas fa-user-edit text-warning"></i>
+                <span>User edited</span>
+            `;
+            statusDiv.className = 'answer-status user-edited';
+        });
+    });
+}
+
+function saveFormData() {
+    const formData = {};
+    const answerFields = document.querySelectorAll('.answer-field');
+    
+    answerFields.forEach(field => {
+        const questionId = field.dataset.fieldId;
+        formData[questionId] = field.value;
+    });
+    
+    // Save to API
+    fetch(`/api/prior-auths/${automationData.id}/save-form-answers`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            answers: formData
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            const message = document.createElement('div');
+            message.className = 'alert alert-success';
+            message.innerHTML = `<i class="fas fa-save"></i> ${data.message}`;
+            document.getElementById('form-processing-summary').appendChild(message);
+            
+            setTimeout(() => message.remove(), 3000);
+        } else {
+            // Show error message
+            const message = document.createElement('div');
+            message.className = 'alert alert-danger';
+            message.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Error: ${data.error}`;
+            document.getElementById('form-processing-summary').appendChild(message);
+            
+            setTimeout(() => message.remove(), 5000);
+        }
+    })
+    .catch(error => {
+        console.error('Error saving form data:', error);
+        const message = document.createElement('div');
+        message.className = 'alert alert-danger';
+        message.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Error saving form data: ${error.message}`;
+        document.getElementById('form-processing-summary').appendChild(message);
+        
+        setTimeout(() => message.remove(), 5000);
+    });
+}
+
+function exportForm() {
+    const formData = {};
+    const answerFields = document.querySelectorAll('.answer-field');
+    
+    answerFields.forEach(field => {
+        const questionId = field.dataset.fieldId;
+        const questionText = field.closest('.question-item').querySelector('.question-text').textContent;
+        formData[questionId] = {
+            question: questionText,
+            answer: field.value
+        };
+    });
+    
+    // Create downloadable file
+    const dataStr = JSON.stringify(formData, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'genetic_testing_form_answers.json';
+    link.click();
+    
+    URL.revokeObjectURL(url);
 }

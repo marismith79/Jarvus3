@@ -72,6 +72,13 @@ class MockEHRSystem:
             'diagnosis_date': patient['diagnosis_and_stage']['date_of_diagnosis']
         }
     
+    def get_full_patient_record(self, mrn):
+        """Get the complete patient record with all data"""
+        if mrn not in self.patients:
+            return None
+        
+        return self.patients[mrn]
+    
     def get_patient_documents(self, mrn):
         """Get patient clinical documents"""
         if mrn not in self.patients:

@@ -2,7 +2,7 @@
 from flask import Flask, render_template, jsonify, request
 from backend.mock_ehr_system import MockEHRSystem
 from backend.gpt5_integration import GPT5Integration
-from backend.insurance_analysis import enhanced_insurance_analyzer, run_automation_workflow
+from backend.insurance_analysis import enhanced_insurance_analyzer, run_automation_workflow, run_form_completion_in_background
 from backend.form_manager import FormManager
 from backend.interactive_form_editor import InteractiveFormEditor
 import json
@@ -169,7 +169,7 @@ def run_automation_workflow_thread(auth_id):
             return
         
         # Run the automation workflow using the insurance analysis module
-        result = run_automation_workflow(auth_id, auth, background_tasks, automation_details, db)
+        result = asyncio.run(run_automation_workflow(auth_id, auth, background_tasks, automation_details, db))
         
         if result.get('error'):
             background_tasks[auth_id]['error'] = result['error']
@@ -183,6 +183,14 @@ def run_automation_workflow_thread(auth_id):
         # Store form results if available
         if 'form_result' in result:
             background_tasks[auth_id]['results']['form'] = result['form_result']
+        
+        # Check if ready for form completion
+        if result.get('ready_for_form', False):
+            print(f"🔄 Coverage analysis complete, starting form completion for auth {auth_id}")
+            # Start form completion in background
+            form_thread = threading.Thread(target=run_form_completion_in_background, args=(auth_id, auth, background_tasks, automation_details, db))
+            form_thread.daemon = True
+            form_thread.start()
         
     except Exception as e:
         print(f"Error in background automation workflow: {e}")
@@ -531,101 +539,7 @@ def run_coverage_analysis_in_background(auth_id, auth):
         print(f"Error in coverage analysis: {e}")
         return {'error': str(e)}
 
-def run_form_completion_in_background(auth_id, auth):
-    """Run form completion in background"""
-    try:
-        # Extract EHR data
-        background_tasks[auth_id]['message'] = 'Extracting EHR data...'
-        background_tasks[auth_id]['last_update'] = datetime.now()
-        automation_details[auth_id]['current_activity'] = 'Extracting patient data from EHR'
-        
-        # Simulate EHR data extraction with citations
-        patient_mrn = auth.get('patient_mrn', '')
-        ehr_data = {}
-        if patient_mrn:
-            try:
-                ehr_data = ehr_system.get_patient_data(patient_mrn)
-                automation_details[auth_id]['form_data']['patient_info'] = {
-                    'name': auth.get('patient_name', ''),
-                    'mrn': patient_mrn,
-                    'dob': ehr_data.get('patient_admin', {}).get('date_of_birth', 'N/A'),
-                    'gender': ehr_data.get('patient_admin', {}).get('gender', 'N/A'),
-                    'source': 'EHR System - Patient Demographics'
-                }
-                
-                # Add citation for patient data
-                automation_details[auth_id]['citations'].append({
-                    'source': 'EHR System',
-                    'url': f'/api/ehr/patient/{patient_mrn}',
-                    'title': 'Patient Demographics',
-                    'relevance': 100,
-                    'type': 'ehr_data'
-                })
-                
-            except Exception as e:
-                print(f"Error getting EHR data: {e}")
-        
-        time.sleep(1)  # Simulate processing time
-        
-        # Fill form fields
-        background_tasks[auth_id]['progress'] = 60
-        background_tasks[auth_id]['message'] = 'Filling form fields...'
-        background_tasks[auth_id]['last_update'] = datetime.now()
-        automation_details[auth_id]['current_activity'] = 'Populating form fields with extracted data'
-        
-        automation_details[auth_id]['form_data']['service_info'] = {
-            'service_type': auth.get('service_type', ''),
-            'cpt_code': auth.get('cpt_code', ''),
-            'diagnosis': auth.get('diagnosis', ''),
-            'source': 'Prior Authorization Request'
-        }
-        
-        automation_details[auth_id]['form_data']['insurance_info'] = {
-            'provider': auth.get('payer', ''),
-            'requirements': auth.get('insurance_requirements', ''),
-            'source': 'Insurance Provider Database'
-        }
-        
-        # Add citations for form data
-        automation_details[auth_id]['citations'].append({
-            'source': 'Prior Auth Request',
-            'url': f'/api/prior-auths/{auth_id}',
-            'title': 'Service Information',
-            'relevance': 100,
-            'type': 'form_data'
-        })
-        
-        time.sleep(1)  # Simulate processing time
-        
-        # Validate form data
-        background_tasks[auth_id]['progress'] = 80
-        background_tasks[auth_id]['message'] = 'Validating form data...'
-        background_tasks[auth_id]['last_update'] = datetime.now()
-        automation_details[auth_id]['current_activity'] = 'Validating form data against requirements'
-        
-        # Simulate validation
-        validation_errors = []
-        if not auth.get('cpt_code'):
-            validation_errors.append('CPT code is required')
-        
-        automation_details[auth_id]['form_data']['validation'] = {
-            'errors': validation_errors,
-            'status': 'valid' if not validation_errors else 'invalid',
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        time.sleep(1)  # Simulate processing time
-        
-        # Return form completion result
-        return {
-            'form_data': automation_details[auth_id]['form_data'],
-            'validation_errors': validation_errors,
-            'submission_ready': len(validation_errors) == 0
-        }
-        
-    except Exception as e:
-        print(f"Error in form completion: {e}")
-        return {'error': str(e)}
+
 
 
 
@@ -734,7 +648,7 @@ def resume_automation(auth_id):
 def run_form_completion_only(auth_id, auth):
     """Run only form completion step (for resumed automations)"""
     try:
-        form_result = run_form_completion_in_background(auth_id, auth)
+        form_result = run_form_completion_in_background(auth_id, auth, background_tasks, automation_details, db)
         
         if 'error' in form_result:
             background_tasks[auth_id]['error'] = form_result['error']
@@ -1448,7 +1362,7 @@ def finalize_form(session_id):
 # Enhanced Form Completion Streaming Endpoint
 @app.route('/api/prior-auths/<int:auth_id>/form-completion-stream', methods=['POST'])
 def form_completion_stream(auth_id):
-    """Stream form completion with EHR data extraction using new form manager"""
+    """Stream form completion with systematic question processing"""
     from flask import Response, stream_with_context
     import json
     
@@ -1462,98 +1376,209 @@ def form_completion_stream(auth_id):
                 yield f"data: {json.dumps({'error': 'Prior authorization not found'})}\n\n"
                 return
             
+            # Import the form question processor
+            from backend.form_question_processor import FormQuestionProcessor
+            from backend.mock_ehr_system import MockEHRSystem
+            
+            # Initialize systems
+            ehr_system = MockEHRSystem()
+            form_processor = FormQuestionProcessor(ehr_system)
+            
             # Extract data for form completion
-            cpt_code = auth.get('cpt_code', '')
-            insurance_provider = auth.get('payer', '')
             patient_mrn = auth.get('patient_mrn', '')
             
             # Send initial status
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Starting enhanced form completion with EHR data extraction...', 'progress': 0})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Starting systematic form question processing...', 'progress': 0})}\n\n"
             
-            # Get form template
-            form_template = form_manager.get_form_template(insurance_provider, cpt_code)
-            yield f"data: {json.dumps({'type': 'status', 'message': f'Using form template: {form_template["name"]}', 'progress': 10})}\n\n"
+            # Process all questions systematically
+            question_results = form_processor.process_all_questions(
+                patient_mrn=patient_mrn,
+                auth_data=auth,
+                progress_callback=None  # We'll handle progress updates manually
+            )
             
-            # Extract EHR data using form manager
-            extracted_data = form_manager.extract_ehr_data_for_form(patient_mrn, form_template)
-            
-            if 'error' in extracted_data:
-                yield f"data: {json.dumps({'type': 'error', 'error': extracted_data['error'], 'progress': 20})}\n\n"
+            if 'error' in question_results:
+                yield f"data: {json.dumps({'type': 'error', 'error': question_results['error'], 'progress': 100})}\n\n"
                 return
             
-            yield f"data: {json.dumps({'type': 'status', 'message': 'EHR data extraction complete', 'progress': 30})}\n\n"
+            # Send progress updates for each section
+            total_questions = question_results['total_questions']
+            processed_questions = 0
             
-            # Process each section and field
-            total_fields = sum(len(section['fields']) for section in form_template['sections'])
-            processed_fields = 0
-            
-            for section in form_template['sections']:
-                section_data = extracted_data['patient_info'].get(section['id'], {})
+            for section in question_results['sections']:
+                yield f"data: {json.dumps({'type': 'status', 'message': f'Processing {section["section_name"]} section...', 'progress': 20})}\n\n"
                 
-                for field in section['fields']:
-                    field_id = field['id']
-                    field_data = section_data.get(field_id, {})
+                for question in section['questions']:
+                    processed_questions += 1
+                    progress = 20 + int((processed_questions / total_questions) * 70)
                     
-                    if field_data.get('value'):
-                        yield f"data: {json.dumps({'type': 'form_field', 'field': field['label'], 'value': field_data['value'], 'justification': f'Extracted from EHR: {field_data["source"]}', 'sources': [field_data['source']], 'progress': 40 + (processed_fields * 2)})}\n\n"
-                    else:
-                        yield f"data: {json.dumps({'type': 'form_field', 'field': field['label'], 'value': 'Not found', 'justification': 'Field not found in EHR', 'sources': ['Not available'], 'progress': 40 + (processed_fields * 2)})}\n\n"
+                    # Send question processing update
+                    yield f"data: {json.dumps({
+                        'type': 'question_processed',
+                        'question_id': question['id'],
+                        'question': question['question'],
+                        'status': question['status'],
+                        'answer': question.get('answer', ''),
+                        'source': question.get('source', ''),
+                        'progress': progress
+                    })}\n\n"
                     
-                    processed_fields += 1
+                    # Small delay to simulate processing
+                    time.sleep(0.1)
             
-            # Create final form result
-            form_sections = []
-            for section in form_template['sections']:
-                section_data = extracted_data['patient_info'].get(section['id'], {})
-                section_fields = []
-                
-                for field in section['fields']:
-                    field_id = field['id']
-                    field_data = section_data.get(field_id, {})
-                    
-                    section_fields.append({
-                        'label': field['label'],
-                        'value': field_data.get('value', ''),
-                        'sources': [field_data.get('source', 'Not available')]
-                    })
-                
-                form_sections.append({
-                    'title': section['title'],
-                    'fields': section_fields
-                })
-            
-            ehr_citations = [
-                {'field': 'Patient Name', 'value': extracted_data.get('patient_name', {}).get('value', ''), 'source': 'EHR System'},
-                {'field': 'Diagnosis', 'value': extracted_data.get('diagnosis', {}).get('value', ''), 'source': 'EHR System'},
-                {'field': 'Provider', 'value': extracted_data.get('provider_name', {}).get('value', ''), 'source': 'EHR System'}
-            ]
-            
-            policy_references = [
-                {'title': 'Medicare Coverage Policy', 'url': 'https://www.cms.gov/medicare-coverage-database', 'relevance': 95},
-                {'title': 'Clinical Practice Guidelines', 'url': 'https://www.nccn.org/guidelines', 'relevance': 90},
-                {'title': 'FDA Approval Information', 'url': 'https://www.fda.gov/drugs', 'relevance': 85}
-            ]
-            
-            final_result = {
-                'completed_fields': len(form_fields),
-                'total_fields': len(form_fields),
-                'sections': form_sections,
-                'ehr_citations': ehr_citations,
-                'policy_references': policy_references
-            }
-            
-            # Send final result
-            yield f"data: {json.dumps({'type': 'complete', 'result': final_result, 'progress': 100})}\n\n"
-            
-            # Update database
-            db.update_prior_auth_status(auth_id, 'completed')
+            # Send completion status
+            yield f"data: {json.dumps({
+                'type': 'complete', 
+                'progress': 100, 
+                'result': {
+                    'form_title': question_results['form_title'],
+                    'form_id': question_results['form_id'],
+                    'version': question_results['version'],
+                    'total_questions': question_results['total_questions'],
+                    'completed_questions': question_results['completed_questions'],
+                    'missing_data': question_results['missing_data'],
+                    'processing_time': question_results['processing_time'],
+                    'sections': question_results['sections']
+                }
+            })}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
     
-    return Response(stream_with_context(generate_form_stream()), 
+    return Response(stream_with_context(generate_form_stream()), mimetype='text/plain')
+
+# Real-time Question Processing Endpoint
+@app.route('/api/prior-auths/<int:auth_id>/process-questions-realtime', methods=['POST'])
+def process_questions_realtime(auth_id):
+    """Process questions in real-time and stream updates"""
+    from flask import Response, stream_with_context
+    import json
+    import time
+    
+    def generate_realtime_stream():
+        try:
+            # Get prior authorization data
+            prior_auths = db.get_prior_auths_by_status('all')
+            auth = next((pa for pa in prior_auths if pa['id'] == auth_id), None)
+            
+            if not auth:
+                yield f"data: {json.dumps({'error': 'Prior authorization not found'})}\n\n"
+                return
+            
+            # Import the form question processor
+            from backend.form_question_processor import FormQuestionProcessor
+            from backend.mock_ehr_system import MockEHRSystem
+            
+            # Initialize systems
+            ehr_system = MockEHRSystem()
+            form_processor = FormQuestionProcessor(ehr_system)
+            
+            # Extract data for form completion
+            patient_mrn = auth.get('patient_mrn', '')
+            
+            # Send initial status
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Starting real-time question processing...', 'progress': 0})}\n\n"
+            
+            # Get all questions from the form
+            form_questions = form_processor.form_questions
+            total_questions = form_processor.get_total_questions()
+            processed_questions = 0
+            
+            # Process each section and question
+            for section in form_questions.get('sections', []):
+                section_name = section.get('section_name', '')
+                yield f"data: {json.dumps({'type': 'section_start', 'section': section_name, 'progress': 10})}\n\n"
+                
+                for question in section.get('questions', []):
+                    processed_questions += 1
+                    progress = 10 + int((processed_questions / total_questions) * 80)
+                    
+                    # Send question start
+                    yield f"data: {json.dumps({
+                        'type': 'question_start',
+                        'question_id': question.get('id'),
+                        'question': question.get('question'),
+                        'progress': progress
+                    })}\n\n"
+                    
+                    # Simulate processing time
+                    time.sleep(0.5)
+                    
+                    # Process the question
+                    patient_data = ehr_system.get_patient_data(patient_mrn)
+                    question_result = form_processor._process_question(
+                        question, patient_data, patient_mrn, auth
+                    )
+                    
+                    # Send question result
+                    yield f"data: {json.dumps({
+                        'type': 'question_result',
+                        'question_id': question.get('id'),
+                        'status': question_result.get('status'),
+                        'answer': question_result.get('answer'),
+                        'source': question_result.get('source'),
+                        'confidence': question_result.get('confidence'),
+                        'progress': progress + 5
+                    })}\n\n"
+                    
+                    # Small delay between questions
+                    time.sleep(0.2)
+                
+                # Send section complete
+                yield f"data: {json.dumps({'type': 'section_complete', 'section': section_name, 'progress': progress + 5})}\n\n"
+            
+            # Send completion
+            yield f"data: {json.dumps({
+                'type': 'complete',
+                'total_questions': total_questions,
+                'processed_questions': processed_questions,
+                'progress': 100
+            })}\n\n"
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+    
+    return Response(stream_with_context(generate_realtime_stream()), 
                    mimetype='text/event-stream',
                    headers={'Cache-Control': 'no-cache', 'Connection': 'keep-alive'})
+
+# API endpoint to get form questions
+@app.route('/api/form-questions', methods=['GET'])
+def get_form_questions():
+    """Get all form questions from the genetic testing form"""
+    try:
+        from backend.form_question_processor import FormQuestionProcessor
+        from backend.mock_ehr_system import MockEHRSystem
+        
+        ehr_system = MockEHRSystem()
+        form_processor = FormQuestionProcessor(ehr_system)
+        
+        return jsonify({
+            'success': True,
+            'form_questions': form_processor.form_questions,
+            'total_questions': form_processor.get_total_questions()
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+# API endpoint to save form answers
+@app.route('/api/prior-auths/<int:auth_id>/save-form-answers', methods=['POST'])
+def save_form_answers(auth_id):
+    """Save form answers for a prior authorization"""
+    try:
+        data = request.get_json()
+        answers = data.get('answers', {})
+        
+        # Store answers in database (for demo, we'll just return success)
+        # In a real implementation, this would save to the database
+        
+        return jsonify({
+            'success': True,
+            'message': f'Saved {len(answers)} answers for prior authorization {auth_id}',
+            'saved_answers': answers
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 # API endpoints for workflows
 @app.get('/api/workflows')

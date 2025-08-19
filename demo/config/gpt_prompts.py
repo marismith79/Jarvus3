@@ -77,6 +77,77 @@ def create_medicare_search_prompt(query: str) -> str:
     """
 
 
+def create_general_insurance_search_prompt(query: str) -> str:
+    """
+    Create a comprehensive search prompt for general insurance documents including Medicaid and commercial insurance.
+    """
+    return f"""
+    You are a medical policy search assistant. Search for medical policy documents related to: {query}
+    
+    CRITICAL INSTRUCTIONS:
+    1. Use REAL web search to find actual documents
+    2. Do NOT hallucinate or create fake URLs, titles, or sources
+    3. Only return results from real websites and documents that actually exist
+    4. Return results in EXACT JSON format as specified below
+    5. If no real results are found, return an empty array: []
+    
+    SEARCH PRIORITY (in order):
+    1. Insurance provider medical policies and coverage documents
+    2. State Medicaid policies and coverage determinations
+    3. Medicaid managed care organization policies
+    4. Clinical practice guidelines (NCCN, ASCO, etc.)
+    5. FDA approvals, clearances, and companion diagnostics
+    6. Professional society guidelines and recommendations
+    7. State health department policies
+    8. Insurance provider prior authorization forms and requirements
+    
+    REQUIRED JSON FORMAT:
+    You MUST return results in this EXACT JSON format:
+    [
+        {{
+            "title": "Exact document title from the webpage",
+            "url": "Full URL to the document",
+            "snippet": "Brief description or excerpt from the document",
+            "relevance": 85,
+            "type": "medicaid_policy|insurance_policy|clinical_guideline|fda_document|policy_document|prior_auth_form",
+            "source": "Organization name (e.g., Medicaid, Insurance Provider, FDA, NCCN, ASCO)"
+        }}
+    ]
+    
+    DOCUMENT TYPE MAPPING:
+    - "medicaid_policy" = Medicaid state policies and coverage determinations
+    - "insurance_policy" = Insurance provider medical policies
+    - "clinical_guideline" = Clinical practice guidelines
+    - "fda_document" = FDA approvals and clearances
+    - "policy_document" = Other policy documents
+    - "prior_auth_form" = Prior authorization forms and requirements
+    
+    EXAMPLES OF VALID RESULTS:
+    [
+        {{
+            "title": "Medicaid Genetic Testing Prior Authorization Form",
+            "url": "https://portal.ct.gov/dss/health-and-home-care/medical-programs/medicaid-husky-health",
+            "snippet": "Connecticut Medicaid prior authorization requirements for genetic testing services",
+            "relevance": 95,
+            "type": "medicaid_policy",
+            "source": "Connecticut Department of Social Services"
+        }}
+    ]
+    
+    DO NOT:
+    - Return markdown links like [title](url)
+    - Include explanatory text outside the JSON
+    - Create fake or example URLs
+    - Return partial or malformed JSON
+    
+    DO:
+    - Return ONLY valid JSON array
+    - Use real URLs from actual websites
+    - Include accurate titles and descriptions
+    - Set appropriate relevance scores (0-100)
+    """
+
+
 def create_medicare_document_analysis_prompt(search_result: dict) -> str:
     """
     Create an optimized analysis prompt for Medicare documents.
@@ -348,20 +419,64 @@ def create_medicare_analysis_prompt(
     """
 
 
-def create_parsing_agent_prompt(relevant_docs: list, patient_context: dict, cpt_code: str, insurance_provider: str) -> str:
+def create_parsing_agent_prompt(relevant_docs: list, patient_context: dict, cpt_code: str, insurance_provider: str, patient_mrn: str = None) -> str:
     """
     Create prompt for the parsing agent to analyze documents and validate requests.
     """
     # Extract document content for analysis
     doc_content = []
     for doc in relevant_docs[:5]:  # Limit to top 5 most relevant
+        # Use full content if available, otherwise fall back to snippet
+        content = doc.get('full_content', doc.get('snippet', 'No content available'))
         doc_content.append(f"""
 Document: {doc.get('title', 'Unknown')}
 URL: {doc.get('url', 'N/A')}
 Type: {doc.get('type', 'Unknown')}
 Relevance: {doc.get('relevance', 0)}%
-Content: {doc.get('snippet', 'No content available')}
+Full Content: {content}
 """)
+    
+    # Get patient EHR data if MRN is provided
+    patient_ehr_data = ""
+    if patient_mrn:
+        try:
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from backend.mock_ehr_system import MockEHRSystem
+            ehr_system = MockEHRSystem()
+            ehr_data = ehr_system.get_full_patient_record(patient_mrn)
+            
+            if ehr_data:
+                # Extract relevant patient data for analysis
+                patient_ehr_data = f"""
+PATIENT EHR DATA (MRN: {patient_mrn}):
+Patient Name: {ehr_data.get('patient_admin', {}).get('name', {}).get('given', 'Unknown')} {ehr_data.get('patient_admin', {}).get('name', {}).get('family', 'Unknown')}
+Diagnosis: {ehr_data.get('diagnosis_and_stage', {}).get('description', 'Unknown')}
+Stage: {ehr_data.get('diagnosis_and_stage', {}).get('stage_group', 'Unknown')}
+Ordering Provider: {ehr_data.get('ordering_provider', {}).get('name', 'Unknown')}
+Lab Performing: {ehr_data.get('lab_performing', {}).get('lab_name', 'Unknown')}
+CLIA Number: {ehr_data.get('lab_performing', {}).get('clia', 'Unknown')}
+NPI: {ehr_data.get('lab_performing', {}).get('npi', 'Unknown')}
+
+Genetic Counseling & Consent:
+{ehr_data.get('genetics_counseling_and_consent', 'Not available')}
+
+Family History:
+{ehr_data.get('family_history', 'Not available')}
+
+Clinical Notes:
+"""
+                # Add clinical notes
+                for note in ehr_data.get('clinical_notes', [])[:3]:  # Limit to first 3 notes
+                    patient_ehr_data += f"""
+- Type: {note.get('type', 'Unknown')}
+  Date: {note.get('date', 'Unknown')}
+  Author: {note.get('author', 'Unknown')}
+  Content: {note.get('text', 'No content')[:200]}...
+"""
+        except Exception as e:
+            patient_ehr_data = f"Error loading patient EHR data: {str(e)}"
     
     # Create patient context summary
     patient_summary = f"""
@@ -385,7 +500,7 @@ CRITICAL INSTRUCTIONS:
 4. Extract SPECIFIC, DETAILED criteria from the policy documents
 5. If request is invalid, ALWAYS draft a detailed clinician message
 
-TASK: Analyze the provided policy documents and patient context to:
+TASK: Analyze the provided policy documents, patient context, and patient EHR data to:
 
 1. **Extract DETAILED Critical Requirements**: 
    - Extract SPECIFIC medical necessity criteria from the documents
@@ -395,7 +510,7 @@ TASK: Analyze the provided policy documents and patient context to:
 
 2. **Validate PA Request**: 
    - Check if the clinician's request is valid based on available information
-   - Check if all required documentation is present
+   - Check if all required documentation is present in the patient EHR data
    - Identify any gaps in the request
    - Set is_valid to FALSE if ANY required documentation is missing
    - Set is_valid to TRUE ONLY if ALL required documentation is present
@@ -420,6 +535,8 @@ DOCUMENTS TO ANALYZE:
 
 PATIENT CONTEXT:
 {patient_summary}
+
+{patient_ehr_data}
 
 REQUIRED JSON FORMAT:
 {{
@@ -493,11 +610,18 @@ VALIDATION RULES:
   * Genetic counseling documentation (when patient_context shows has_genetic_counseling: false)
   * Family history documentation (when patient_context shows has_family_history: false)
   * Clinical indication documentation (when patient_context shows has_clinical_indication: false)
-  * CLIA certification documentation
-  * Physician order documentation
+  * CLIA certification documentation (check if lab_performing.clia is present in patient EHR data)
+  * Physician order documentation (check if ordering_provider is present and clinical notes contain physician orders)
   * Any other specific requirements mentioned in policy documents
 
 - Set is_valid to TRUE ONLY if ALL required documentation is present and verified.
+
+IMPORTANT VALIDATION GUIDELINES:
+- CLIA Certification: If lab_performing.clia is present in patient EHR data, consider CLIA certification documented
+- Physician Order: If ordering_provider is present and clinical notes contain physician orders or medical necessity documentation, consider physician order documented
+- Genetic Counseling: If genetics_counseling_and_consent is present OR clinical notes contain genetic counseling documentation, consider genetic counseling documented
+- Family History: If family_history is present OR clinical notes mention family history, consider family history documented
+- Clinical Indication: If clinical notes contain medical necessity, clinical indication, or treatment planning documentation, consider clinical indication documented
 """
 
 

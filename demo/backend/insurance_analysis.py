@@ -14,6 +14,7 @@ from openai import OpenAI
 from config.mac_jurisdictions import MAC_JURISDICTIONS, STATE_MAPPING
 from config.gpt_prompts import (
     create_medicare_search_prompt,
+    create_general_insurance_search_prompt,
     create_medicare_document_analysis_prompt,
     create_medicare_analysis_prompt,
     create_parsing_agent_prompt,
@@ -316,6 +317,10 @@ class EnhancedInsuranceAnalysis:
         is_medicare = any(medicare_term in insurance_provider.lower() 
                          for medicare_term in ['medicare', 'original medicare', 'cms'])
         
+        # Check if this is a Medicaid provider
+        is_medicaid = any(medicaid_term in insurance_provider.lower() 
+                         for medicaid_term in ['medicaid', 'husky', 'state health'])
+        
         if is_medicare:
             # Core Medicare Coverage Documents (NCDs, LCDs, LCAs)
             queries.extend([
@@ -413,8 +418,32 @@ class EnhancedInsuranceAnalysis:
                 f"Medicare budget impact {cpt_code} {service_type}"
             ])
             
+        elif is_medicaid:
+            # Medicaid-Specific Queries
+            queries.extend([
+                f"{insurance_provider} Medicaid medical policy {cpt_code} {service_type}",
+                f"{insurance_provider} Medicaid prior authorization {cpt_code} {service_type}",
+                f"{insurance_provider} Medicaid coverage requirements {cpt_code} {service_type}",
+                f"{insurance_provider} Medicaid medical necessity {cpt_code} {service_type}",
+                f"{insurance_provider} Medicaid clinical policy {cpt_code} {service_type}",
+                f"{insurance_provider} Medicaid utilization management {cpt_code} {service_type}",
+                f"{insurance_provider} Medicaid genetic testing policy {cpt_code} {service_type}",
+                f"{insurance_provider} Medicaid managed care policy {cpt_code} {service_type}",
+                f"site:medicaid.gov {insurance_provider} {cpt_code} {service_type}",
+                f"site:portal.ct.gov {insurance_provider} {cpt_code} {service_type}",
+                f"site:ct.gov {insurance_provider} {cpt_code} {service_type}",
+                f"Medicaid state policy {cpt_code} {service_type}",
+                f"Medicaid managed care {cpt_code} {service_type}",
+                f"Medicaid prior authorization form {cpt_code} {service_type}",
+                f"Medicaid coverage determination {cpt_code} {service_type}",
+                f"Medicaid clinical guidelines {cpt_code} {service_type}",
+                f"Medicaid evidence-based coverage {cpt_code} {service_type}",
+                f"Medicaid FDA approval {cpt_code} {service_type}",
+                f"Medicaid professional guidelines {cpt_code} {service_type}",
+                f"Medicaid cost effectiveness {cpt_code} {service_type}"
+            ])
         else:
-            # Non-Medicare Provider Comprehensive Queries
+            # Non-Medicare/Non-Medicaid Provider Comprehensive Queries
             queries.extend([
                 f"{insurance_provider} medical policy {cpt_code} {service_type} coverage requirements",
                 f"{insurance_provider} prior authorization requirements {cpt_code} {service_type}",
@@ -442,8 +471,11 @@ class EnhancedInsuranceAnalysis:
             print("⚠️  Using demo key - falling back to simulated results")
             return self._get_fallback_search_results(query)
         
-        # Enhanced prompt for Medicare document search
-        search_prompt = create_medicare_search_prompt(query)
+        # Choose appropriate search prompt based on query content
+        if any(medicare_term in query.lower() for medicare_term in ['medicare', 'ncd', 'lcd', 'lca', 'cms']):
+            search_prompt = create_medicare_search_prompt(query)
+        else:
+            search_prompt = create_general_insurance_search_prompt(query)
         
         # Log the request details
         print(f"\n🔍 {self.gpt_model.upper()} SEARCH REQUEST:")
@@ -1427,7 +1459,7 @@ class EnhancedInsuranceAnalysis:
         
         return unique_results
     
-    async def _analyze_documents_with_parsing_agent(self, search_results: List[Dict], patient_context: Dict, cpt_code: str, insurance_provider: str) -> Dict:
+    async def _analyze_documents_with_parsing_agent(self, search_results: List[Dict], patient_context: Dict, cpt_code: str, insurance_provider: str, patient_mrn: str = None) -> Dict:
         """
         Parsing agent that analyzes documents to determine:
         - Checklist of critical requirements for coverage
@@ -1456,7 +1488,7 @@ class EnhancedInsuranceAnalysis:
                 }
             
             # Create prompt for parsing agent
-            prompt = create_parsing_agent_prompt(relevant_docs, patient_context, cpt_code, insurance_provider)
+            prompt = create_parsing_agent_prompt(relevant_docs, patient_context, cpt_code, insurance_provider, patient_mrn)
             
             # Call GPT-5 for analysis
             response = await self._call_gpt5_direct(prompt)
@@ -1504,7 +1536,7 @@ class EnhancedInsuranceAnalysis:
                             {"role": "user", "content": prompt}
                         ],
                         temperature=0.3,
-                        max_tokens=2000
+                        # max_tokens=2000
                     ),
                     timeout=60.0
                 )
@@ -1647,7 +1679,7 @@ class EnhancedInsuranceAnalysis:
     
     async def _extract_policy_documents(self, search_results: List[Dict]) -> List[Dict]:
         """
-        Extract policy documents from search results by analyzing each result.
+        Extract policy documents from search results by analyzing each result in parallel.
         
         Args:
             search_results: List of search result dictionaries
@@ -1655,21 +1687,130 @@ class EnhancedInsuranceAnalysis:
         Returns:
             List of extracted policy documents with detailed information
         """
-        policy_documents = []
+        if not search_results:
+            return []
         
-        for result in search_results:
-            try:
-                # Analyze the document using GPT
-                analysis_result = await self._analyze_document_with_gpt(result)
-                if analysis_result:
-                    policy_documents.append(analysis_result)
-                    print(f"✅ Policy document parsing successful for: {result.get('title', 'Unknown')}")
-            except Exception as e:
-                print(f"❌ Error analyzing document {result.get('title', 'Unknown')}: {e}")
-                continue
+        # Limit to top 5 documents to avoid overwhelming the system
+        documents_to_process = search_results[:5]
+        print(f"📄 Processing {len(documents_to_process)} policy documents in parallel...")
+        
+        # Create tasks for parallel document processing
+        process_tasks = []
+        for result in documents_to_process:
+            task = self._process_single_document(result)
+            process_tasks.append(task)
+        
+        # Execute all document processing in parallel
+        try:
+            process_results = await asyncio.gather(*process_tasks, return_exceptions=True)
+            
+            # Process results, handling any exceptions
+            policy_documents = []
+            for i, result in enumerate(process_results):
+                if isinstance(result, Exception):
+                    print(f"❌ Error processing document '{documents_to_process[i].get('title', 'Unknown')}': {result}")
+                    continue
+                elif result:
+                    policy_documents.append(result)
+                    print(f"✅ Policy document parsing successful for: {documents_to_process[i].get('title', 'Unknown')}")
+                    
+        except Exception as e:
+            print(f"❌ Error in parallel document processing: {e}")
+            # Fallback to sequential processing if parallel fails
+            policy_documents = []
+            for result in documents_to_process:
+                try:
+                    processed_doc = await self._process_single_document(result)
+                    if processed_doc:
+                        policy_documents.append(processed_doc)
+                        print(f"✅ Policy document parsing successful for: {result.get('title', 'Unknown')}")
+                except Exception as e:
+                    print(f"Error processing document {result.get('title', 'Unknown')}: {e}")
+                    continue
         
         print(f"📊 Successfully parsed {len(policy_documents)} policy documents")
         return policy_documents
+    
+    async def _process_single_document(self, result: Dict) -> Optional[Dict]:
+        """
+        Process a single document by fetching content and analyzing it.
+        
+        Args:
+            result: Single search result dictionary
+            
+        Returns:
+            Dictionary with extracted policy information or None if processing fails
+        """
+        try:
+            # Fetch full document content first
+            full_content = await self._fetch_document_content(result)
+            if full_content:
+                result['full_content'] = full_content
+            
+            # Analyze the document using GPT
+            analysis_result = await self._analyze_document_with_gpt(result)
+            return analysis_result
+            
+        except Exception as e:
+            print(f"❌ Error processing document {result.get('title', 'Unknown')}: {e}")
+            return None
+    
+    async def _fetch_document_content(self, search_result: Dict) -> Optional[str]:
+        """
+        Fetch the full content of a document from its URL.
+        
+        Args:
+            search_result: Search result dictionary with URL
+            
+        Returns:
+            Full document content as string, or None if fetch fails
+        """
+        try:
+            url = search_result.get('url', '')
+            if not url or not url.startswith('http'):
+                return None
+            
+            # Use GPT to fetch and extract content from the URL
+            fetch_prompt = f"""
+            Please fetch and extract the full content from this URL: {url}
+            
+            Focus on extracting:
+            1. Policy requirements and criteria
+            2. Medical necessity guidelines
+            3. Documentation requirements
+            4. Clinical indications
+            5. Coverage limitations
+            6. CPT codes and billing information
+            
+            Return the full relevant content in a clear, structured format.
+            """
+            
+            # Use GPT-4o with web search capability
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.client.chat.completions.create,
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": "You are a document content extractor. Fetch and extract relevant policy information from web pages."},
+                        {"role": "user", "content": fetch_prompt}
+                    ],
+                    temperature=0.1,
+                    max_tokens=4000
+                ),
+                timeout=30.0
+            )
+            
+            if response and hasattr(response, 'choices') and len(response.choices) > 0:
+                content = response.choices[0].message.content
+                print(f"✅ Fetched full content for: {search_result.get('title', 'Unknown')}")
+                return content
+            else:
+                print(f"❌ Failed to fetch content for: {search_result.get('title', 'Unknown')}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error fetching document content: {e}")
+            return None
     
     async def _analyze_document_with_gpt(self, search_result: Dict) -> Optional[Dict]:
         """
@@ -1696,6 +1837,54 @@ class EnhancedInsuranceAnalysis:
             
         except Exception as e:
             print(f"❌ Error in document analysis: {e}")
+            return None
+    
+    async def _get_gpt_response(self, prompt: str):
+        """
+        Get GPT response for document analysis.
+        
+        Args:
+            prompt: The prompt to send to GPT
+            
+        Returns:
+            GPT response object or None if failed
+        """
+        try:
+            import asyncio
+            
+            if self.gpt_model == 'gpt-5-nano':
+                # Use GPT-5 API format
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.responses.create,
+                        model="gpt-5-nano",
+                        input=prompt
+                    ),
+                    timeout=60.0
+                )
+                return response
+            else:
+                # Use GPT-4o API format as fallback
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.chat.completions.create,
+                        model="gpt-4o",
+                        messages=[
+                            {"role": "system", "content": "You are a medical policy document analyzer."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.3,
+                        max_tokens=2000
+                    ),
+                    timeout=60.0
+                )
+                return response
+                
+        except asyncio.TimeoutError:
+            print(f"GPT response call timed out")
+            return None
+        except Exception as e:
+            print(f"Error in GPT response call: {e}")
             return None
     
     def _parse_document_analysis_response(self, response, search_result: Dict) -> Dict:
@@ -1770,7 +1959,7 @@ class EnhancedInsuranceAnalysis:
 # Global instance
 enhanced_insurance_analyzer = EnhancedInsuranceAnalysis()
 
-def run_automation_workflow(auth_id: str, auth_data: dict, background_tasks: dict, automation_details: dict, db) -> dict:
+async def run_automation_workflow(auth_id: str, auth_data: dict, background_tasks: dict, automation_details: dict, db) -> dict:
     """
     Run the complete automation workflow for prior authorization.
     
@@ -1824,46 +2013,63 @@ def run_automation_workflow(auth_id: str, auth_data: dict, background_tasks: dic
         background_tasks[auth_id]['message'] = f'Running {len(important_queries)} searches...'
         background_tasks[auth_id]['last_update'] = datetime.now()
         
-        # Run searches
-        all_search_results = []
-        for i, query in enumerate(important_queries):
-            try:
-                background_tasks[auth_id]['message'] = f'Searching: {query[:50]}...'
-                background_tasks[auth_id]['last_update'] = datetime.now()
-                
-                # Update current activity
-                automation_details[auth_id]['current_activity'] = f'Searching: {query}'
-                
-                search_results = asyncio.run(enhanced_insurance_analyzer._gpt_search(None, query))
-                if search_results:
-                    all_search_results.extend(search_results)
+        # Run searches in parallel
+        background_tasks[auth_id]['message'] = f'Running {len(important_queries)} searches in parallel...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        automation_details[auth_id]['current_activity'] = f'Running {len(important_queries)} parallel searches'
+        
+        # Create search tasks for parallel execution
+        search_tasks = []
+        for query in important_queries:
+            task = enhanced_insurance_analyzer._gpt_search(None, query)
+            search_tasks.append(task)
+        
+        # Execute all searches in parallel
+        try:
+            search_results_list = await asyncio.gather(*search_tasks, return_exceptions=True)
+            
+            # Process results, handling any exceptions
+            all_search_results = []
+            for i, result in enumerate(search_results_list):
+                if isinstance(result, Exception):
+                    print(f"❌ Error searching for query '{important_queries[i]}': {result}")
+                    continue
+                elif result:
+                    all_search_results.extend(result)
                     
                     # Store search results with query context
                     automation_details[auth_id]['search_results'].append({
-                        'query': query,
-                        'results': search_results,
+                        'query': important_queries[i],
+                        'results': result,
                         'timestamp': datetime.now().isoformat()
                     })
                     
                     # Add citations
-                    for result in search_results:
-                        if result.get('url') and result.get('title'):
+                    for search_result in result:
+                        if search_result.get('url') and search_result.get('title'):
                             automation_details[auth_id]['citations'].append({
-                                'source': result.get('source', 'Unknown'),
-                                'url': result.get('url'),
-                                'title': result.get('title'),
-                                'relevance': result.get('relevance', 0),
+                                'source': search_result.get('source', 'Unknown'),
+                                'url': search_result.get('url'),
+                                'title': search_result.get('title'),
+                                'relevance': search_result.get('relevance', 0),
                                 'type': 'search_result'
                             })
-                
-                background_tasks[auth_id]['progress'] = 30 + (i * 10)
-                background_tasks[auth_id]['last_update'] = datetime.now()
-                
-            except Exception as e:
-                print(f"Error in search query '{query}': {e}")
+                    
+        except Exception as e:
+            print(f"❌ Error in parallel search execution: {e}")
+            # Fallback to sequential search if parallel fails
+            all_search_results = []
+            for query in important_queries:
+                try:
+                    search_results = await enhanced_insurance_analyzer._gpt_search(None, query)
+                    if search_results:
+                        all_search_results.extend(search_results)
+                except Exception as e:
+                    print(f"Error searching for query '{query}': {e}")
+                    continue
         
         # Update progress
-        background_tasks[auth_id]['progress'] = 70
+        background_tasks[auth_id]['progress'] = 35
         background_tasks[auth_id]['message'] = 'Processing search results...'
         background_tasks[auth_id]['last_update'] = datetime.now()
         
@@ -1871,50 +2077,132 @@ def run_automation_workflow(auth_id: str, auth_data: dict, background_tasks: dic
         unique_results = enhanced_insurance_analyzer._deduplicate_search_results(all_search_results)
         
         # Update progress
-        background_tasks[auth_id]['progress'] = 75
+        background_tasks[auth_id]['progress'] = 40
         background_tasks[auth_id]['message'] = 'Extracting policy documents...'
         background_tasks[auth_id]['last_update'] = datetime.now()
         
-        # Extract policy documents
-        automation_details[auth_id]['current_activity'] = 'Extracting policy documents from search results'
-        policy_documents = asyncio.run(enhanced_insurance_analyzer._extract_policy_documents(unique_results[:10]))
-        automation_details[auth_id]['extracted_documents'] = policy_documents
+        # Extract policy documents and run parsing agent analysis in parallel
+        automation_details[auth_id]['current_activity'] = 'Running parallel document processing and parsing agent analysis'
+        
+        # Create tasks for parallel execution
+        doc_tasks = []
+        
+        # Task 1: Extract policy documents
+        doc_extraction_task = enhanced_insurance_analyzer._extract_policy_documents(unique_results[:10])
+        doc_tasks.append(doc_extraction_task)
+        
+        # Task 2: Run parsing agent analysis
+        parsing_agent_task = enhanced_insurance_analyzer._analyze_documents_with_parsing_agent(
+            unique_results[:10], patient_context, cpt_code, insurance_provider, patient_mrn
+        )
+        doc_tasks.append(parsing_agent_task)
+        
+        # Execute document processing tasks in parallel
+        try:
+            doc_results = await asyncio.gather(*doc_tasks, return_exceptions=True)
+            
+            # Process results
+            policy_documents = doc_results[0] if not isinstance(doc_results[0], Exception) else []
+            parsing_agent_result = doc_results[1] if not isinstance(doc_results[1], Exception) else {}
+            
+            # If document extraction failed, use empty list
+            if isinstance(doc_results[0], Exception):
+                print(f"❌ Document extraction failed: {doc_results[0]}")
+                policy_documents = []
+            
+            # If parsing agent analysis failed, use fallback
+            if isinstance(doc_results[1], Exception):
+                print(f"❌ Parsing agent analysis failed: {doc_results[1]}")
+                parsing_agent_result = enhanced_insurance_analyzer._create_fallback_parsing_result()
+            
+            automation_details[auth_id]['extracted_documents'] = policy_documents
+            automation_details[auth_id]['parsing_agent_results'] = parsing_agent_result
+            
+        except Exception as e:
+            print(f"❌ Error in parallel document processing: {e}")
+            # Fallback to sequential execution
+            policy_documents = await enhanced_insurance_analyzer._extract_policy_documents(unique_results[:10])
+            parsing_agent_result = await enhanced_insurance_analyzer._analyze_documents_with_parsing_agent(
+                unique_results[:10], patient_context, cpt_code, insurance_provider, patient_mrn
+            )
+            automation_details[auth_id]['extracted_documents'] = policy_documents
+            automation_details[auth_id]['parsing_agent_results'] = parsing_agent_result
         
         # Update progress
-        background_tasks[auth_id]['progress'] = 80
-        background_tasks[auth_id]['message'] = 'Running parsing agent analysis...'
+        background_tasks[auth_id]['progress'] = 45
+        background_tasks[auth_id]['message'] = 'Running parallel analysis tasks...'
         background_tasks[auth_id]['last_update'] = datetime.now()
         
-        # Run parsing agent analysis
-        automation_details[auth_id]['current_activity'] = 'Running parsing agent analysis'
-        parsing_agent_result = asyncio.run(enhanced_insurance_analyzer._analyze_documents_with_parsing_agent(
-            unique_results[:10], patient_context, cpt_code, insurance_provider
-        ))
+        # Run coverage analysis, patient criteria checking, and recommendations generation in parallel
+        analysis_tasks = []
         
-        # Store parsing agent results
-        automation_details[auth_id]['parsing_agent_results'] = parsing_agent_result
-        
-        # Update progress
-        background_tasks[auth_id]['progress'] = 90
-        background_tasks[auth_id]['message'] = 'Analyzing coverage and requirements...'
-        background_tasks[auth_id]['last_update'] = datetime.now()
-        
-        # Analyze coverage and requirements
-        coverage_info = asyncio.run(enhanced_insurance_analyzer._analyze_coverage_and_requirements_with_gpt(
+        # Task 1: Analyze coverage and requirements
+        coverage_task = enhanced_insurance_analyzer._analyze_coverage_and_requirements_with_gpt(
             cpt_code, insurance_provider, policy_documents, patient_context, mac_jurisdiction
-        ))
+        )
+        analysis_tasks.append(coverage_task)
         
-        # Check patient criteria
-        patient_criteria_match = {}
+        # Task 2: Check patient criteria (only if patient context exists)
         if patient_context:
-            patient_criteria_match = asyncio.run(enhanced_insurance_analyzer._check_patient_criteria_with_gpt(
-                coverage_info.requirements, patient_context
-            ))
+            criteria_task = enhanced_insurance_analyzer._check_patient_criteria_with_gpt(
+                [], patient_context  # We'll update this with actual requirements after coverage analysis
+            )
+            analysis_tasks.append(criteria_task)
+        else:
+            criteria_task = None
         
-        # Generate recommendations
-        recommendations = asyncio.run(enhanced_insurance_analyzer._generate_recommendations_with_gpt(
-            coverage_info, patient_criteria_match, patient_context
-        ))
+        # Task 3: Generate recommendations (we'll update this after coverage analysis)
+        recommendations_task = enhanced_insurance_analyzer._generate_recommendations_with_gpt(
+            None, {}, patient_context  # We'll update this after coverage analysis
+        )
+        analysis_tasks.append(recommendations_task)
+        
+        # Execute analysis tasks in parallel
+        try:
+            analysis_results = await asyncio.gather(*analysis_tasks, return_exceptions=True)
+            
+            # Process results
+            coverage_info = analysis_results[0] if not isinstance(analysis_results[0], Exception) else None
+            patient_criteria_match = analysis_results[1] if len(analysis_results) > 1 and not isinstance(analysis_results[1], Exception) else {}
+            recommendations = analysis_results[2] if len(analysis_results) > 2 and not isinstance(analysis_results[2], Exception) else []
+            
+            # If coverage analysis failed, use fallback
+            if not coverage_info:
+                print("❌ Coverage analysis failed, using fallback")
+                coverage_info = enhanced_insurance_analyzer._get_fallback_analysis(
+                    cpt_code, insurance_provider, policy_documents, mac_jurisdiction
+                )
+            
+            # If patient criteria checking failed or wasn't run, use fallback
+            if not patient_criteria_match and patient_context:
+                print("❌ Patient criteria checking failed, using fallback")
+                patient_criteria_match = enhanced_insurance_analyzer._get_fallback_criteria_match(
+                    coverage_info.requirements, patient_context
+                )
+            
+            # If recommendations generation failed, use fallback
+            if not recommendations:
+                print("❌ Recommendations generation failed, using fallback")
+                recommendations = enhanced_insurance_analyzer._get_fallback_recommendations(
+                    coverage_info, patient_criteria_match
+                )
+                    
+        except Exception as e:
+            print(f"❌ Error in parallel analysis execution: {e}")
+            # Fallback to sequential execution
+            coverage_info = await enhanced_insurance_analyzer._analyze_coverage_and_requirements_with_gpt(
+                cpt_code, insurance_provider, policy_documents, patient_context, mac_jurisdiction
+            )
+            
+            patient_criteria_match = {}
+            if patient_context:
+                patient_criteria_match = await enhanced_insurance_analyzer._check_patient_criteria_with_gpt(
+                    coverage_info.requirements, patient_context
+                )
+            
+            recommendations = await enhanced_insurance_analyzer._generate_recommendations_with_gpt(
+                coverage_info, patient_criteria_match, patient_context
+            )
         
         # Create final result
         final_result = {
@@ -1973,16 +2261,33 @@ def _build_patient_context(patient_mrn: str, auth_data: dict) -> dict:
             sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             from backend.mock_ehr_system import MockEHRSystem
             ehr_system = MockEHRSystem()
-            ehr_data = ehr_system.get_patient_data(patient_mrn)
+            ehr_data = ehr_system.get_full_patient_record(patient_mrn)
             
             # Check for genetic counseling documentation
             has_genetic_counseling = False
+            
+            # First check for formal consent documentation
             if 'genetics_counseling_and_consent' in ehr_data:
                 counseling_data = ehr_data['genetics_counseling_and_consent']
+                # Check for consent documentation with required elements
                 has_genetic_counseling = (
-                    counseling_data.get('genetic_counselor') and 
-                    counseling_data.get('counseling_date') and
-                    counseling_data.get('risk_assessment_completed', False)
+                    counseling_data.get('consent_id') and 
+                    counseling_data.get('date_signed') and
+                    counseling_data.get('elements_checked') and
+                    len(counseling_data.get('elements_checked', [])) >= 3  # At least 3 consent elements checked
+                )
+            
+            # If no formal consent, check for genetic counseling notes
+            if not has_genetic_counseling and 'clinical_notes' in ehr_data:
+                clinical_notes = ehr_data['clinical_notes']
+                has_genetic_counseling = any(
+                    (note.get('type') == 'Genetic Counseling Note' and
+                     ('pre-test counseling' in note.get('text', '').lower() or
+                      'genetic counseling' in note.get('text', '').lower() or
+                      'counseling conducted' in note.get('text', '').lower())) or
+                    ('genetic counseling offered' in note.get('text', '').lower() or
+                     'consent obtained for genetic testing' in note.get('text', '').lower())
+                    for note in clinical_notes
                 )
             
             # Check for family history documentation
@@ -1990,13 +2295,25 @@ def _build_patient_context(patient_mrn: str, auth_data: dict) -> dict:
             if 'family_history' in ehr_data and ehr_data['family_history']:
                 has_family_history = len(ehr_data['family_history']) > 0
             
+            # If no structured family history, check clinical notes for family history mentions
+            if not has_family_history and 'clinical_notes' in ehr_data:
+                clinical_notes = ehr_data['clinical_notes']
+                has_family_history = any(
+                    'family history' in note.get('text', '').lower() or
+                    'family history reviewed' in note.get('text', '').lower()
+                    for note in clinical_notes
+                )
+            
             # Check for clinical indication documentation
             has_clinical_indication = False
             if 'clinical_notes' in ehr_data and ehr_data['clinical_notes']:
                 clinical_notes = ehr_data['clinical_notes']
                 has_clinical_indication = any(
-                    'medical necessity' in note.get('content', '').lower() or
-                    'clinical indication' in note.get('content', '').lower()
+                    'medical necessity' in note.get('text', '').lower() or
+                    'clinical indication' in note.get('text', '').lower() or
+                    'comprehensive tumor profiling' in note.get('text', '').lower() or
+                    'molecular profiling' in note.get('text', '').lower() or
+                    'genetic testing' in note.get('text', '').lower()
                     for note in clinical_notes
                 )
             
@@ -2101,22 +2418,133 @@ def _continue_with_form_completion(auth_id: str, auth_data: dict, automation_det
         background_tasks[auth_id]['last_update'] = datetime.now()
         return {'should_pause': True}
     
-    # Simulate form completion
+    # Prepare for form completion step
     form_result = {
-        'status': 'completed',
+        'status': 'ready_for_completion',
         'form_data': automation_details[auth_id].get('form_data', {}),
-        'message': 'Form completion simulated successfully'
+        'message': 'Ready for form completion'
     }
     
-    # Store results and mark as complete
+    # Store results but don't mark as complete yet
     background_tasks[auth_id]['results']['form'] = form_result
-    background_tasks[auth_id]['current_step'] = 3
-    background_tasks[auth_id]['message'] = 'Automation complete!'
-    background_tasks[auth_id]['progress'] = 100
+    background_tasks[auth_id]['current_step'] = 2
+    background_tasks[auth_id]['message'] = 'Coverage analysis complete. Ready for form completion.'
+    background_tasks[auth_id]['progress'] = 50
     background_tasks[auth_id]['is_running'] = False
     background_tasks[auth_id]['last_update'] = datetime.now()
     
-    # Update database status
-    db.update_prior_auth_status(auth_id, 'completed')
+    # Update database status to indicate ready for form completion
+    db.update_prior_auth_status(auth_id, 'ready_for_form')
     
-    return {'should_pause': False, 'form_result': form_result}
+    return {'should_pause': False, 'form_result': form_result, 'ready_for_form': True}
+
+def run_form_completion_in_background(auth_id: str, auth_data: dict, background_tasks: dict, automation_details: dict, db) -> dict:
+    """Run form completion in background with systematic question processing"""
+    try:
+        # Import required modules
+        import sys
+        import os
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from backend.mock_ehr_system import MockEHRSystem
+        from backend.form_question_processor import FormQuestionProcessor
+        
+        # Initialize systems
+        ehr_system = MockEHRSystem()
+        form_processor = FormQuestionProcessor(ehr_system)
+        
+        # Extract patient MRN
+        patient_mrn = auth_data.get('patient_mrn', '')
+        if not patient_mrn:
+            background_tasks[auth_id]['error'] = 'No patient MRN provided'
+            background_tasks[auth_id]['is_running'] = False
+            return {'error': 'No patient MRN provided'}
+        
+        # Update status
+        background_tasks[auth_id]['message'] = 'Starting systematic form question processing...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        automation_details[auth_id]['current_activity'] = 'Processing form questions systematically'
+        
+        # Progress callback function
+        def update_progress(progress: int, message: str):
+            background_tasks[auth_id]['progress'] = 50 + (progress * 0.5)  # Scale to 50-100%
+            background_tasks[auth_id]['message'] = message
+            background_tasks[auth_id]['last_update'] = datetime.now()
+            automation_details[auth_id]['current_activity'] = message
+        
+        # Process all questions systematically
+        question_results = form_processor.process_all_questions(
+            patient_mrn=patient_mrn,
+            auth_data=auth_data,
+            progress_callback=update_progress
+        )
+        
+        if 'error' in question_results:
+            background_tasks[auth_id]['error'] = question_results['error']
+            background_tasks[auth_id]['is_running'] = False
+            return {'error': question_results['error']}
+        
+        # Store comprehensive form results
+        automation_details[auth_id]['form_data'] = {
+            'form_title': question_results['form_title'],
+            'form_id': question_results['form_id'],
+            'version': question_results['version'],
+            'sections': question_results['sections'],
+            'total_questions': question_results['total_questions'],
+            'completed_questions': question_results['completed_questions'],
+            'missing_data': question_results['missing_data'],
+            'processing_time': question_results['processing_time'],
+            'patient_info': {
+                'name': auth_data.get('patient_name', ''),
+                'mrn': patient_mrn,
+                'source': 'EHR System - Patient Demographics'
+            },
+            'service_info': {
+                'service_type': auth_data.get('service_type', ''),
+                'cpt_code': auth_data.get('cpt_code', ''),
+                'diagnosis': auth_data.get('diagnosis', ''),
+                'source': 'Prior Authorization Request'
+            }
+        }
+        
+        # Add citations from question processing
+        automation_details[auth_id]['citations'].extend(question_results['citations'])
+        
+        # Validate form completion
+        background_tasks[auth_id]['progress'] = 95
+        background_tasks[auth_id]['message'] = 'Validating form completion...'
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        automation_details[auth_id]['current_activity'] = 'Validating form completion'
+        
+        # Check for missing required data
+        validation_errors = []
+        for missing_item in question_results['missing_data']:
+            validation_errors.append(f"Missing data for question {missing_item['question_id']}: {missing_item['reason']}")
+        
+        automation_details[auth_id]['form_data']['validation'] = {
+            'errors': validation_errors,
+            'status': 'valid' if not validation_errors else 'needs_clinician_input',
+            'timestamp': datetime.now().isoformat(),
+            'completion_rate': f"{question_results['completed_questions']}/{question_results['total_questions']} questions completed"
+        }
+        
+        time.sleep(1)  # Simulate processing time
+        
+        # Complete automation
+        background_tasks[auth_id]['progress'] = 100
+        background_tasks[auth_id]['message'] = 'Automation completed successfully!'
+        background_tasks[auth_id]['is_running'] = False
+        background_tasks[auth_id]['last_update'] = datetime.now()
+        
+        # Update database status
+        db.update_prior_auth_status(auth_id, 'completed')
+        
+        # Return form completion result
+        return {
+            'form_data': automation_details[auth_id]['form_data'],
+            'validation_errors': validation_errors,
+            'submission_ready': len(validation_errors) == 0
+        }
+        
+    except Exception as e:
+        print(f"Error in form completion: {e}")
+        return {'error': str(e)}
