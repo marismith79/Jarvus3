@@ -377,7 +377,7 @@
     },
     "diagnosis_and_stage": {
       "primary_icd10": "C18.7",
-      "description": "Metastatic colorectal cancer",
+      "description": "Metastatic colorectal adenocarcinoma, sigmoid",
       "ajcc_edition": "8",
       "tnm": "T3N1M1",
       "stage_group": "IV",
@@ -432,17 +432,47 @@
               "gene": "KRAS",
               "hgvs": "Wild-type",
               "tier": "NA"
+            },
+            {
+              "gene": "NRAS",
+              "hgvs": "Wild-type",
+              "tier": "NA"
             }
           ],
           "summary_metrics": {
             "MSI": "High",
             "TMB": 40,
             "PD-L1_cps": 5
+          },
+          "rna_fusion_panel": "No actionable fusions detected",
+          "mmr_workup": {
+            "mlh1_pms2": "Loss",
+            "msh2_msh6": "Intact",
+            "mlh1_promoter_methylation": "Positive"
           }
         },
         "classification_system": "AMP/ASCO/CAP tiers"
       },
-      "prior_tests": []
+      "prior_tests": [
+        {
+          "test_name": "MMR IHC",
+          "date": "2024-06-01",
+          "result": "MLH1/PMS2 loss; MSH2/MSH6 intact",
+          "lab": "Department of Pathology"
+        },
+        {
+          "test_name": "MLH1 Promoter Methylation",
+          "date": "2024-06-04",
+          "result": "Positive",
+          "lab": "Department of Pathology"
+        },
+        {
+          "test_name": "RAS Panel PCR",
+          "date": "2024-06-05",
+          "result": "KRAS WT; NRAS WT",
+          "lab": "Department of Pathology"
+        }
+      ]
     },
     "treatment_history": {
       "systemic_therapies": [
@@ -491,6 +521,27 @@
         "value": 3.47,
         "unit": "g/dL",
         "date": "2025-03-14"
+      },
+      {
+        "loinc": "2039-6",
+        "name": "CEA [Mass/volume]",
+        "value": 16.2,
+        "unit": "ng/mL",
+        "date": "2024-07-15"
+      },
+      {
+        "loinc": "2039-6",
+        "name": "CEA [Mass/volume]",
+        "value": 12.8,
+        "unit": "ng/mL",
+        "date": "2024-10-01"
+      },
+      {
+        "loinc": "2039-6",
+        "name": "CEA [Mass/volume]",
+        "value": 11.9,
+        "unit": "ng/mL",
+        "date": "2025-02-10"
       }
     ],
     "family_history": [
@@ -567,7 +618,7 @@
         "type": "Progress Note (SOAP)",
         "author": "Dr. Jordan Rivera",
         "date": "2025-01-13",
-        "text": "S: Mia Anderson seen in clinic for follow-up of Metastatic colorectal cancer, stage IV. Reports fatigue level 3/10, mild dyspnea on exertion. No fever, chest pain, or bleeding. \nO: ECOG 1. Vitals stable. Lungs clear. No focal neurologic deficits. Labs reviewed: Cr 1.34 mg/dL; Hgb 12.5 g/dL.\nA: Metastatic colorectal cancer, on active treatment. Molecular profiling ordered: Tumor/Normal Exome with RNA Fusion (CPT 81455). Noted prior tests count: 0.\nP: Proceed with molecular test. If actionable alterations present, will consider targeted therapy per guidelines. Will submit prior authorization today with supporting documents."
+        "text": "S: Mia Anderson seen in clinic for follow-up of Metastatic colorectal adenocarcinoma, sigmoid, stage IV. Reports fatigue level 3/10, mild dyspnea on exertion. No fever, chest pain, or bleeding. \nO: ECOG 1. Vitals stable. Lungs clear. No focal neurologic deficits. Labs reviewed: Cr 1.34 mg/dL; Hgb 12.5 g/dL; CEA trending down from 16.2 to 11.9 ng/mL.\nA: Metastatic colorectal adenocarcinoma, sigmoid, on active treatment with pembrolizumab. Comprehensive genomic profiling completed: BRAF V600E, KRAS/NRAS WT, MSI-H, TMB 40. Results support ongoing immunotherapy and identify BRAF-directed therapy options at progression.\nP: Continue pembrolizumab. On progression, consider encorafenib + cetuximab (BRAF V600E, RAS WT). Results enable targeted therapy selection and trial eligibility. Prior authorization submitted with complete supporting documentation."
       },
       {
         "note_id": "0f7afa2b-650c-431b-9138-cb3a23d8b724",

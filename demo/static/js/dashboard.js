@@ -663,7 +663,7 @@ async function pollAutomationStatus(authId) {
         
         // Check if ready for form completion (when run_automation_workflow returns True)
         if ((status.results && status.results.form && status.results.form.status === 'ready_for_completion') || 
-            (status.details && status.details.get('ready_for_form') === true) ||
+            (status.details && (status.details.get ? status.details.get('ready_for_form') : status.details.ready_for_form) === true) ||
             (status.message && status.message.includes('Ready for form completion')) ||
             (caseStatus === 'ready_for_form')) {
             console.log('🔄 Coverage analysis complete, switching to form processing tab');
@@ -4412,10 +4412,11 @@ function saveFormData() {
     });
 }
 
-function exportForm() {
+async function exportForm() {
     const formData = {};
     const answerFields = document.querySelectorAll('.answer-field');
     
+    // Collect all form answers
     answerFields.forEach(field => {
         const questionId = field.dataset.fieldId;
         const questionText = field.closest('.question-item').querySelector('.question-text').textContent;
@@ -4425,17 +4426,88 @@ function exportForm() {
         };
     });
     
-    // Create downloadable file
-    const dataStr = JSON.stringify(formData, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    const url = URL.createObjectURL(dataBlob);
+    // Show loading state
+    const exportBtn = document.getElementById('export-form-btn');
+    const originalText = exportBtn.innerHTML;
+    exportBtn.disabled = true;
+    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
     
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'genetic_testing_form_answers.json';
-    link.click();
+    try {
+        // Call the PDF export endpoint
+        const response = await fetch(`/api/prior-auths/${automationData.id}/export-pdf`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                form_data: formData
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to generate PDF');
+        }
+        
+        // Get the PDF blob
+        const pdfBlob = await response.blob();
+        
+        // Create download link
+        const url = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Medicaid_Genetic_Testing_PA_Form_${automationData.patient_name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+        link.click();
+        
+        // Clean up
+        URL.revokeObjectURL(url);
+        
+        // Show success message
+        showMessage('PDF form exported successfully!', 'success');
+        
+    } catch (error) {
+        console.error('Error exporting PDF:', error);
+        showMessage(`Error exporting PDF: ${error.message}`, 'error');
+        
+        // Fallback to JSON export if PDF fails
+        console.log('Falling back to JSON export...');
+        const dataStr = JSON.stringify(formData, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
+        const url = URL.createObjectURL(dataBlob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'genetic_testing_form_answers.json';
+        link.click();
+        
+        URL.revokeObjectURL(url);
+        
+    } finally {
+        // Reset button state
+        exportBtn.disabled = false;
+        exportBtn.innerHTML = originalText;
+    }
+}
+
+function showMessage(message, type = 'info') {
+    // Create message element
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} alert-dismissible fade show`;
+    messageDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
     
-    URL.revokeObjectURL(url);
+    // Add to page
+    const container = document.querySelector('.form-processing-summary') || document.body;
+    container.insertBefore(messageDiv, container.firstChild);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            messageDiv.remove();
+        }
+    }, 5000);
 }
 
 // Helper functions for follow-up questions
