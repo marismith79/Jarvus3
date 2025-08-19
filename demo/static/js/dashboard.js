@@ -4413,24 +4413,11 @@ function saveFormData() {
 }
 
 async function exportForm() {
-    const formData = {};
-    const answerFields = document.querySelectorAll('.answer-field');
-    
-    // Collect all form answers
-    answerFields.forEach(field => {
-        const questionId = field.dataset.fieldId;
-        const questionText = field.closest('.question-item').querySelector('.question-text').textContent;
-        formData[questionId] = {
-            question: questionText,
-            answer: field.value
-        };
-    });
-    
     // Show loading state
     const exportBtn = document.getElementById('export-form-btn');
     const originalText = exportBtn.innerHTML;
     exportBtn.disabled = true;
-    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
+    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading PDF...';
     
     try {
         // Call the PDF export endpoint
@@ -4439,9 +4426,7 @@ async function exportForm() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                form_data: formData
-            })
+            body: JSON.stringify({})
         });
         
         if (!response.ok) {
@@ -4463,24 +4448,11 @@ async function exportForm() {
         URL.revokeObjectURL(url);
         
         // Show success message
-        showMessage('PDF form exported successfully!', 'success');
+        showMessage('PDF form downloaded successfully!', 'success');
         
     } catch (error) {
-        console.error('Error exporting PDF:', error);
-        showMessage(`Error exporting PDF: ${error.message}`, 'error');
-        
-        // Fallback to JSON export if PDF fails
-        console.log('Falling back to JSON export...');
-        const dataStr = JSON.stringify(formData, null, 2);
-        const dataBlob = new Blob([dataStr], {type: 'application/json'});
-        const url = URL.createObjectURL(dataBlob);
-        
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'genetic_testing_form_answers.json';
-        link.click();
-        
-        URL.revokeObjectURL(url);
+        console.error('Error downloading PDF:', error);
+        showMessage(`Error downloading PDF: ${error.message}`, 'error');
         
     } finally {
         // Reset button state

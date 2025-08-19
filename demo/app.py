@@ -1686,16 +1686,10 @@ def save_form_answers(auth_id):
 # API endpoint to export filled PDF form
 @app.route('/api/prior-auths/<int:auth_id>/export-pdf', methods=['POST'])
 def export_pdf_form(auth_id):
-    """Export the filled Medicaid Genetic Testing PA Form as PDF"""
+    """Export the Medicaid Genetic Testing PA Form PDF from the database"""
     try:
         from flask import send_file
-        from backend.pdf_form_filler import PDFFormFiller
-        from backend.form_question_processor import FormQuestionProcessor
-        from backend.mock_ehr_system import MockEHRSystem
-        
-        # Get the form data from the request
-        data = request.get_json()
-        form_data = data.get('form_data', {})
+        import os
         
         # Get prior authorization data
         prior_auths = db.get_prior_auths_by_status('all')
@@ -1704,56 +1698,18 @@ def export_pdf_form(auth_id):
         if not auth:
             return jsonify({'success': False, 'error': 'Prior authorization not found'}), 404
         
-        # Initialize systems
-        ehr_system = MockEHRSystem()
-        form_processor = FormQuestionProcessor(ehr_system)
+        # Path to the existing PDF file in the db folder
+        pdf_path = os.path.join(os.path.dirname(__file__), 'db', 'Medicaid Genetic Testing PA Form.pdf')
         
-        # Get patient information
-        patient_info = {
-            'mrn': auth.get('patient_mrn', ''),
-            'name': auth.get('patient_name', ''),
-            'dob': auth.get('patient_dob', ''),
-            'address': '123 Main Street, Hartford, CT 06106'  # Default address
-        }
+        if not os.path.exists(pdf_path):
+            return jsonify({'success': False, 'error': 'PDF form template not found'}), 404
         
-        # Get service information
-        service_info = {
-            'service_type': auth.get('service_type', ''),
-            'date_of_service': datetime.now().strftime('%Y-%m-%d'),
-            'type_of_test': 'Gene panel',
-            'gene_mutation_tested': 'Comprehensive genomic profiling (334 genes)',
-            'icd10_codes': auth.get('icd10', 'C34.90'),
-            'cpt_codes': auth.get('cpt_code', '')
-        }
-        
-        # Get provider information
-        provider_info = {
-            'billing_provider': 'Hartford Hospital (Medicaid #123456)',
-            'ordering_provider': f"{auth.get('ordering_provider', 'Dr. Jordan Rivera')}, Oncology (Medicaid #789012)",
-            'provider_address': '80 Seymour Street, Hartford, CT 06102'
-        }
-        
-        # Combine all data for PDF filling
-        complete_form_data = {
-            **form_data,
-            'service_info': service_info,
-            'provider_info': provider_info
-        }
-        
-        # Create PDF form filler and generate PDF
-        pdf_filler = PDFFormFiller()
-        pdf_content = pdf_filler.fill_form(complete_form_data, patient_info)
-        
-        # Generate filename
-        filename = pdf_filler.generate_filename(patient_info['name'])
-        
-        # Create a temporary file-like object
-        from io import BytesIO
-        pdf_stream = BytesIO(pdf_content)
-        pdf_stream.seek(0)
+        # Generate filename with patient name
+        patient_name = auth.get('patient_name', 'Unknown_Patient').replace(' ', '_')
+        filename = f"Medicaid_Genetic_Testing_PA_Form_{patient_name}_{datetime.now().strftime('%Y%m%d')}.pdf"
         
         return send_file(
-            pdf_stream,
+            pdf_path,
             mimetype='application/pdf',
             as_attachment=True,
             download_name=filename
