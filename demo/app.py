@@ -1490,39 +1490,141 @@ def process_questions_realtime(auth_id):
                 yield f"data: {json.dumps({'type': 'section_start', 'section': section_name, 'progress': 10})}\n\n"
                 
                 for question in section.get('questions', []):
-                    processed_questions += 1
-                    progress = 10 + int((processed_questions / total_questions) * 80)
-                    
-                    # Send question start
-                    yield f"data: {json.dumps({
-                        'type': 'question_start',
-                        'question_id': question.get('id'),
-                        'question': question.get('question'),
-                        'progress': progress
-                    })}\n\n"
-                    
-                    # Simulate processing time
-                    time.sleep(0.5)
-                    
-                    # Process the question
-                    patient_data = ehr_system.get_patient_data(patient_mrn)
-                    question_result = form_processor._process_question(
-                        question, patient_data, patient_mrn, auth
-                    )
-                    
-                    # Send question result
-                    yield f"data: {json.dumps({
-                        'type': 'question_result',
-                        'question_id': question.get('id'),
-                        'status': question_result.get('status'),
-                        'answer': question_result.get('answer'),
-                        'source': question_result.get('source'),
-                        'confidence': question_result.get('confidence'),
-                        'progress': progress + 5
-                    })}\n\n"
-                    
-                    # Small delay between questions
-                    time.sleep(0.2)
+                    # Handle nested provider information structure
+                    if question.get('subsection') and question.get('fields'):
+                        # Process each field in the subsection
+                        for field in question.get('fields', []):
+                            processed_questions += 1
+                            progress = 10 + int((processed_questions / total_questions) * 80)
+                            
+                            # Send field start
+                            yield f"data: {json.dumps({
+                                'type': 'question_start',
+                                'question_id': field.get('id'),
+                                'question': field.get('label'),
+                                'progress': progress
+                            })}\n\n"
+                            
+                            # Simulate processing time
+                            time.sleep(0.5)
+                            
+                            # Create a question-like structure for the field
+                            field_question = {
+                                "id": field.get("id"),
+                                "question": field.get("label"),
+                                "type": field.get("type", "text"),
+                                "required": field.get("required", False)
+                            }
+                            
+                            # Process the field
+                            patient_data = ehr_system.get_patient_data(patient_mrn)
+                            field_result = form_processor._process_question(
+                                field_question, patient_data, patient_mrn, auth
+                            )
+                            
+                            # Send field result
+                            result_data = {
+                                'type': 'question_result',
+                                'question_id': field.get('id'),
+                                'status': field_result.get('status'),
+                                'answer': field_result.get('answer'),
+                                'source': field_result.get('source'),
+                                'confidence': field_result.get('confidence'),
+                                'progress': progress + 5
+                            }
+                            
+                            yield f"data: {json.dumps(result_data)}\n\n"
+                            
+                            # Small delay between fields
+                            time.sleep(0.2)
+                    else:
+                        # Process regular question
+                        processed_questions += 1
+                        progress = 10 + int((processed_questions / total_questions) * 80)
+                        
+                        # Send question start
+                        yield f"data: {json.dumps({
+                            'type': 'question_start',
+                            'question_id': question.get('id'),
+                            'question': question.get('question'),
+                            'progress': progress
+                        })}\n\n"
+                        
+                        # Simulate processing time
+                        time.sleep(0.5)
+                        
+                        # Process the question
+                        patient_data = ehr_system.get_patient_data(patient_mrn)
+                        question_result = form_processor._process_question(
+                            question, patient_data, patient_mrn, auth
+                        )
+                        
+                        # Send question result
+                        result_data = {
+                            'type': 'question_result',
+                            'question_id': question.get('id'),
+                            'status': question_result.get('status'),
+                            'answer': question_result.get('answer'),
+                            'source': question_result.get('source'),
+                            'confidence': question_result.get('confidence'),
+                            'progress': progress + 5
+                        }
+                        
+                        # Include follow-up data if present
+                        if question_result.get('follow_up'):
+                            result_data['follow_up'] = question_result.get('follow_up')
+                        
+                        yield f"data: {json.dumps(result_data)}\n\n"
+                        
+                        # Process follow-up question if it exists
+                        if question_result.get('follow_up'):
+                            processed_questions += 1
+                            progress = 10 + int((processed_questions / total_questions) * 80)
+                            
+                            # Send follow-up question start
+                            yield f"data: {json.dumps({
+                                'type': 'question_start',
+                                'question_id': f"{question.get('id')}_followup",
+                                'question': question_result['follow_up']['question'],
+                                'progress': progress
+                            })}\n\n"
+                            
+                            # Simulate processing time
+                            time.sleep(0.5)
+                            
+                            # Create follow-up question structure
+                            follow_up_question = {
+                                "id": f"{question.get('id')}_followup",
+                                "question": question_result["follow_up"]["question"],
+                                "type": question_result["follow_up"]["type"],
+                                "required": False,
+                                "is_follow_up": True,
+                                "parent_question_id": question.get("id")
+                            }
+                            
+                            # Process the follow-up question
+                            follow_up_result = form_processor._process_question(
+                                follow_up_question, patient_data, patient_mrn, auth
+                            )
+                            
+                            # Send follow-up question result
+                            follow_up_result_data = {
+                                'type': 'question_result',
+                                'question_id': f"{question.get('id')}_followup",
+                                'status': follow_up_result.get('status'),
+                                'answer': follow_up_result.get('answer'),
+                                'source': follow_up_result.get('source'),
+                                'confidence': follow_up_result.get('confidence'),
+                                'progress': progress + 5
+                            }
+                            
+                            yield f"data: {json.dumps(follow_up_result_data)}\n\n"
+                            
+                            # Small delay between follow-up questions
+                            time.sleep(0.2)
+                        
+                        # Small delay between questions
+                        time.sleep(0.2)
                 
                 # Send section complete
                 yield f"data: {json.dumps({'type': 'section_complete', 'section': section_name, 'progress': progress + 5})}\n\n"

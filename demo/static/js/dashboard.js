@@ -1746,6 +1746,9 @@ async function executeFormCompletionWithEHR() {
 
 
 
+// Global variable to store form questions for follow-up handling
+let globalFormQuestions = null;
+
 async function loadFormQuestions() {
     const container = document.getElementById('form-questions-container');
     const totalQuestionsSpan = document.getElementById('total-questions');
@@ -1758,6 +1761,8 @@ async function loadFormQuestions() {
         
         if (data.success) {
             const formQuestions = data.form_questions;
+            // Store globally for follow-up handling
+            globalFormQuestions = formQuestions;
             const totalQuestions = data.total_questions;
             
             // Update total questions count
@@ -1778,15 +1783,65 @@ async function loadFormQuestions() {
                 `;
                 
                 for (const question of section.questions) {
+                    // Handle nested provider information structure
+                    if (question.subsection && question.fields) {
+                        // This is a provider information subsection
+                        questionsHTML += `
+                            <div class="provider-subsection">
+                                <h6 class="subsection-title">${question.subsection}</h6>
+                        `;
+                        
+                        for (const field of question.fields) {
+                            const fieldId = field.id;
+                            const fieldLabel = field.label;
+                            const fieldType = field.type;
+                            const isRequired = field.required;
+                            
+                            let inputHTML = '';
+                            if (fieldType === 'tel') {
+                                inputHTML = `<input type="tel" class="answer-field" placeholder="Agent will populate this answer..." data-field-id="${fieldId}">`;
+                            } else {
+                                inputHTML = `<input type="text" class="answer-field" placeholder="Agent will populate this answer..." data-field-id="${fieldId}">`;
+                            }
+                            
+                            questionsHTML += `
+                                <div class="question-item provider-field" data-question-id="${fieldId}" data-question-type="${fieldType}">
+                                    <div class="question-text">${fieldLabel}${isRequired ? ' <span class="required">*</span>' : ''}</div>
+                                    <div class="answer-container">
+                                        ${inputHTML}
+                                        <div class="answer-status">
+                                            <i class="fas fa-clock"></i>
+                                            <span>Waiting for agent...</span>
+                                        </div>
+                                        <div class="answer-source"></div>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                        
+                        questionsHTML += `</div>`;
+                        continue;
+                    }
+                    
+                    // Handle regular questions
                     const questionId = question.id;
                     const questionText = question.question;
                     const questionType = question.type;
                     const isRequired = question.required;
+                    const hasFollowUp = question.follow_up;
                     
                     let fieldHTML = '';
-                    if (questionType === 'radio' && question.options) {
+                    let questionClass = 'question-item';
+                    
+                    // Handle different question types
+                    if (questionType === 'statement') {
+                        // Statements don't need input fields or status indicators
+                        fieldHTML = '';
+                        questionClass += ' statement-question';
+                    } else if (questionType === 'radio' && question.options) {
+                        const followUpCondition = hasFollowUp ? hasFollowUp.condition : null;
                         fieldHTML = `
-                            <select class="answer-field" data-field-id="${questionId}">
+                            <select class="answer-field" data-field-id="${questionId}" data-has-follow-up="${hasFollowUp ? 'true' : 'false'}" data-follow-up-condition="${followUpCondition || ''}">
                                 <option value="">Agent will populate this answer...</option>
                                 ${question.options.map(option => `<option value="${option}">${option}</option>`).join('')}
                             </select>
@@ -1795,6 +1850,27 @@ async function loadFormQuestions() {
                         fieldHTML = `
                             <textarea class="answer-field" placeholder="Agent will populate this answer..." data-field-id="${questionId}"></textarea>
                         `;
+                    } else if (questionType === 'table') {
+                        const columns = question.columns || [];
+                        const rows = question.rows || 1;
+                        fieldHTML = `
+                            <div class="table-input-container">
+                                <table class="table-input">
+                                    <thead>
+                                        <tr>
+                                            ${columns.map(col => `<th>${col}</th>`).join('')}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${Array(rows).fill().map((_, i) => `
+                                            <tr>
+                                                ${columns.map(col => `<td><input type="text" class="table-cell-input" data-field-id="${questionId}_${i}_${col.toLowerCase().replace(/\s+/g, '_')}" placeholder="..."></td>`).join('')}
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
                     } else {
                         fieldHTML = `
                             <input type="text" class="answer-field" placeholder="Agent will populate this answer..." data-field-id="${questionId}">
@@ -1802,16 +1878,19 @@ async function loadFormQuestions() {
                     }
                     
                     questionsHTML += `
-                        <div class="question-item" data-question-id="${questionId}">
+                        <div class="${questionClass}" data-question-id="${questionId}" data-question-type="${questionType}">
                             <div class="question-text">${questionText}${isRequired ? ' <span class="required">*</span>' : ''}</div>
-                            <div class="answer-container">
-                                ${fieldHTML}
-                                <div class="answer-status">
-                                    <i class="fas fa-clock"></i>
-                                    <span>Waiting for agent...</span>
+                            ${questionType !== 'statement' ? `
+                                <div class="answer-container">
+                                    ${fieldHTML}
+                                    <div class="answer-status">
+                                        <i class="fas fa-clock"></i>
+                                        <span>Waiting for agent...</span>
+                                    </div>
+                                    <div class="answer-source"></div>
                                 </div>
-                                <div class="answer-source"></div>
-                            </div>
+                            ` : ''}
+                            ${hasFollowUp ? `<div class="follow-up-container" style="display: none;"></div>` : ''}
                         </div>
                     `;
                 }
@@ -1905,11 +1984,13 @@ async function startFormAgentProcessing() {
                                 const questionItem = document.querySelector(`[data-question-id="${data.question_id}"]`);
                                 if (questionItem) {
                                     const statusDiv = questionItem.querySelector('.answer-status');
-                                    statusDiv.innerHTML = `
-                                        <i class="fas fa-spinner fa-spin"></i>
-                                        <span>Agent processing...</span>
-                                    `;
-                                    statusDiv.className = 'answer-status processing';
+                                    if (statusDiv) {
+                                        statusDiv.innerHTML = `
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                            <span>Agent processing...</span>
+                                        `;
+                                        statusDiv.className = 'answer-status processing';
+                                    }
                                     
                                     // Auto-scroll to the question being processed
                                     autoScrollToElement(questionItem, { delay: 200 });
@@ -1918,38 +1999,97 @@ async function startFormAgentProcessing() {
                                 
                             case 'question_result':
                                 // Update question with result
-                                const resultItem = document.querySelector(`[data-question-id="${data.question_id}"]`);
+                                let resultItem = document.querySelector(`[data-question-id="${data.question_id}"]`);
+                                
+                                // Handle follow-up questions - find parent question
+                                if (data.question_id && data.question_id.endsWith('_followup')) {
+                                    const parentQuestionId = data.question_id.replace('_followup', '');
+                                    const parentItem = document.querySelector(`[data-question-id="${parentQuestionId}"]`);
+                                    if (parentItem) {
+                                        // Show follow-up container for parent question
+                                        const followUpContainer = parentItem.querySelector('.follow-up-container');
+                                        if (followUpContainer) {
+                                            // Create follow-up question HTML if not already present
+                                            if (!followUpContainer.querySelector('.follow-up-question')) {
+                                                const followUpHTML = `
+                                                    <div class="follow-up-question">
+                                                        <div class="question-text follow-up-text">
+                                                            <i class="fas fa-arrow-right"></i> ${data.question || 'Follow-up question'}
+                                                        </div>
+                                                        <div class="answer-container">
+                                                            <textarea class="answer-field follow-up-field" placeholder="Agent will populate this answer..." data-field-id="${data.question_id}"></textarea>
+                                                            <div class="answer-status">
+                                                                <i class="fas fa-clock"></i>
+                                                                <span>Waiting for agent...</span>
+                                                            </div>
+                                                            <div class="answer-source"></div>
+                                                        </div>
+                                                    </div>
+                                                `;
+                                                followUpContainer.innerHTML = followUpHTML;
+                                                followUpContainer.style.display = 'block';
+                                            }
+                                            
+                                            // Use the follow-up container as the result item
+                                            resultItem = followUpContainer.querySelector('.follow-up-question');
+                                        }
+                                    }
+                                }
+                                
                                 if (resultItem) {
                                     const answerField = resultItem.querySelector('.answer-field');
                                     const statusDiv = resultItem.querySelector('.answer-status');
                                     const sourceDiv = resultItem.querySelector('.answer-source');
+                                    const questionType = resultItem.dataset.questionType;
                                     
-                                    // Populate answer
-                                    if (answerField.tagName === 'SELECT') {
-                                        answerField.value = data.answer || '';
-                                    } else {
-                                        answerField.value = data.answer || '';
-                                    }
-                                    
-                                    // Update status
-                                    if (data.status === 'completed') {
-                                        statusDiv.innerHTML = `
-                                            <i class="fas fa-check-circle text-success"></i>
-                                            <span>Agent completed</span>
-                                        `;
-                                        statusDiv.className = 'answer-status completed';
+                                    // Handle statements differently
+                                    if (questionType === 'statement') {
+                                        // Statements don't need status updates, just count as completed
                                         completedCount++;
                                         completedQuestionsSpan.textContent = completedCount;
                                     } else {
-                                        statusDiv.innerHTML = `
-                                            <i class="fas fa-exclamation-triangle text-warning"></i>
-                                            <span>${data.status}</span>
-                                        `;
-                                        statusDiv.className = 'answer-status error';
+                                        // Populate answer for regular questions
+                                        if (answerField && answerField.tagName === 'SELECT') {
+                                            console.log(`Setting radio button answer for ${data.question_id}: ${data.answer}`);
+                                            answerField.value = data.answer || '';
+                                            
+                                            // Debug specific questions
+                                            if (data.question_id === 'h2' || data.question_id === 'h3') {
+                                                console.log(`DEBUG: Set ${data.question_id} to "${data.answer}", current value: "${answerField.value}"`);
+                                            }
+                                            
+                                            // Handle follow-up questions for radio buttons
+                                            if (data.follow_up && shouldShowFollowUp(resultItem, data.answer)) {
+                                                showFollowUpQuestion(resultItem, data.follow_up);
+                                            } else {
+                                                hideFollowUpQuestion(resultItem);
+                                            }
+                                        } else if (answerField) {
+                                            answerField.value = data.answer || '';
+                                        }
+                                        
+                                        // Update status
+                                        if (statusDiv) {
+                                            if (data.status === 'completed') {
+                                                statusDiv.innerHTML = `
+                                                    <i class="fas fa-check-circle text-success"></i>
+                                                    <span>Agent completed</span>
+                                                `;
+                                                statusDiv.className = 'answer-status completed';
+                                                completedCount++;
+                                                completedQuestionsSpan.textContent = completedCount;
+                                            } else {
+                                                statusDiv.innerHTML = `
+                                                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                                                    <span>${data.status}</span>
+                                                `;
+                                                statusDiv.className = 'answer-status error';
+                                            }
+                                        }
                                     }
                                     
                                     // Show source
-                                    if (data.source) {
+                                    if (data.source && sourceDiv) {
                                         sourceDiv.innerHTML = `<small>Source: ${data.source}</small>`;
                                         sourceDiv.className = 'answer-source populated';
                                     }
@@ -4202,6 +4342,22 @@ function addFieldEditListeners() {
                 <span>User edited</span>
             `;
             statusDiv.className = 'answer-status user-edited';
+            
+            // Handle follow-up questions for radio buttons (select elements)
+            if (this.tagName === 'SELECT' && this.dataset.hasFollowUp === 'true') {
+                const selectedValue = this.value;
+                const followUpCondition = this.dataset.followUpCondition;
+                
+                console.log(`User changed question ${questionItem.dataset.questionId}: value="${selectedValue}", condition="${followUpCondition}"`);
+                
+                if (selectedValue === followUpCondition) {
+                    console.log(`Showing follow-up for question ${questionItem.dataset.questionId}`);
+                    showFollowUpQuestionForUser(questionItem, followUpCondition);
+                } else {
+                    console.log(`Hiding follow-up for question ${questionItem.dataset.questionId}`);
+                    hideFollowUpQuestion(questionItem);
+                }
+            }
         });
     });
 }
@@ -4280,4 +4436,101 @@ function exportForm() {
     link.click();
     
     URL.revokeObjectURL(url);
+}
+
+// Helper functions for follow-up questions
+function shouldShowFollowUp(questionItem, answer) {
+    const answerField = questionItem.querySelector('.answer-field');
+    const followUpCondition = answerField.dataset.followUpCondition;
+    
+    if (!followUpCondition) {
+        console.log(`No follow-up condition found for question ${questionItem.dataset.questionId}`);
+        return false;
+    }
+    
+    console.log(`Checking follow-up for question ${questionItem.dataset.questionId}: answer="${answer}", condition="${followUpCondition}"`);
+    return answer === followUpCondition;
+}
+
+function showFollowUpQuestion(questionItem, followUpData) {
+    const followUpContainer = questionItem.querySelector('.follow-up-container');
+    if (!followUpContainer) return;
+    
+    // Create follow-up question HTML
+    let followUpHTML = `
+        <div class="follow-up-question">
+            <div class="question-text follow-up-text">
+                <i class="fas fa-arrow-right"></i> ${followUpData.question}
+            </div>
+            <div class="answer-container">
+    `;
+    
+    if (followUpData.type === 'text_area') {
+        followUpHTML += `
+            <textarea class="answer-field follow-up-field" placeholder="Agent will populate this answer..." data-field-id="${questionItem.dataset.questionId}_followup"></textarea>
+        `;
+    } else {
+        followUpHTML += `
+            <input type="text" class="answer-field follow-up-field" placeholder="Agent will populate this answer..." data-field-id="${questionItem.dataset.questionId}_followup">
+        `;
+    }
+    
+    followUpHTML += `
+                <div class="answer-status">
+                    <i class="fas fa-clock"></i>
+                    <span>Waiting for agent...</span>
+                </div>
+                <div class="answer-source"></div>
+            </div>
+        </div>
+    `;
+    
+    followUpContainer.innerHTML = followUpHTML;
+    followUpContainer.style.display = 'block';
+    
+    // Add event listener to follow-up field
+    const followUpField = followUpContainer.querySelector('.follow-up-field');
+    if (followUpField) {
+        followUpField.addEventListener('change', function() {
+            const statusDiv = this.closest('.answer-container').querySelector('.answer-status');
+            statusDiv.innerHTML = `
+                <i class="fas fa-user-edit text-warning"></i>
+                <span>User edited</span>
+            `;
+            statusDiv.className = 'answer-status user-edited';
+        });
+    }
+}
+
+function hideFollowUpQuestion(questionItem) {
+    const followUpContainer = questionItem.querySelector('.follow-up-container');
+    if (followUpContainer) {
+        followUpContainer.style.display = 'none';
+        followUpContainer.innerHTML = '';
+    }
+}
+
+function showFollowUpQuestionForUser(questionItem, followUpCondition) {
+    // Find the follow-up data from the global form questions
+    const questionId = questionItem.dataset.questionId;
+    let followUpData = null;
+    
+    // Search through all sections to find the question
+    if (globalFormQuestions && globalFormQuestions.sections) {
+        for (const section of globalFormQuestions.sections) {
+            for (const question of section.questions) {
+                if (question.id === questionId && question.follow_up) {
+                    followUpData = question.follow_up;
+                    break;
+                }
+            }
+            if (followUpData) break;
+        }
+    }
+    
+    if (followUpData) {
+        showFollowUpQuestion(questionItem, followUpData);
+    } else {
+        console.warn(`No follow-up data found for question ${questionId}`);
+    }
 }

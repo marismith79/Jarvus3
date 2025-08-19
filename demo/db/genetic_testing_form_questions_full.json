@@ -4,18 +4,92 @@
   "version": "07/19",
   "sections": [
     {
-      "section_name": "General Information",
+      "section_name": "Member Information",
+      "questions": [
+        {
+          "id": "mi1",
+          "question": "Member ID #",
+          "type": "text",
+          "required": true
+        },
+        {
+          "id": "mi2",
+          "question": "DOB",
+          "type": "date",
+          "required": true
+        },
+        {
+          "id": "mi3",
+          "question": "Member Name (Last, First)",
+          "type": "text",
+          "required": true
+        },
+        {
+          "id": "mi4",
+          "question": "Address",
+          "type": "text",
+          "required": true
+        },
+        {
+          "id": "mi5",
+          "question": "City, State, Zip",
+          "type": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "section_name": "Requested Testing",
       "questions": [
         {
           "id": "q1",
+          "question": "Test Name:",
+          "type": "text",
+          "required": true
+        },
+        {
+          "id": "q2",
+          "question": "Date of Service:",
+          "type": "date",
+          "required": true
+        },
+        {
+          "id": "q3",
+          "question": "Type of Test (e.g., mutation panel, full gene sequencing, gene panel, deletion/duplication):",
+          "type": "text",
+          "required": true,
+          "placeholder": "Enter type of test..."
+        },
+        {
+          "id": "q4",
+          "question": "Note: Requests for testing panels including, but not limited to, multiple genes or multiple conditions, and in cases where a tiered approach/ method is clinically available, are covered only for the number of genes or tests deemed medically necessary to establish a diagnosis.",
+          "type": "statement",
+          "required": false
+        },
+        {
+          "id": "q5",
+          "question": "Gene mutation being tested for:",
+          "type": "text",
+          "required": true,
+          "placeholder": "Enter gene mutation..."
+        },
+        {
+          "id": "q6",
+          "question": "Diagnosis (ICD-10 CM) code(s) to support request for genetic testing:",
+          "type": "text",
+          "required": true,
+          "placeholder": "Enter ICD-10 CM code(s)..."
+        },
+        {
+          "id": "q7",
           "question": "Please list all CPT codes with requested units.",
-          "type": "text_area",
+          "type": "text",
           "required": true,
           "placeholder": "Enter CPT codes and units..."
         },
         {
-          "id": "q2",
-          "question": "Is the ordering provider a board-certified geneticist, genetic counselor, or certified nurse midwife (CNM) with expertise in clinical genetics or in the treatment of the targeted disease?",
+          "id": "q8",
+          "question": "Is the testing being ordered by a physician, advanced practice registered nurse (APRN), or certified nurse midwife (CNM) with expertise in clinical genetics or in the treatment of the targeted disease?",
           "type": "radio",
           "options": ["Yes", "No"],
           "required": true,
@@ -26,7 +100,7 @@
           }
         },
         {
-          "id": "q3",
+          "id": "q9",
           "question": "Will genetic counseling be performed prior to and post-testing?",
           "type": "radio",
           "options": ["Yes", "No"],
@@ -38,15 +112,15 @@
           }
         },
         {
-          "id": "q4",
-          "question": "Is the genetic test reliably associated with the condition or defect?",
+          "id": "q10",
+          "question": "Has a specific mutation or set of mutations been identified and broadly accepted by credible medical societies to be reliably associated with the condition or defect?",
           "type": "radio",
           "options": ["Yes", "No"],
           "required": true
         },
         {
-          "id": "q5",
-          "question": "Are there any other diagnostic studies available (imaging, laboratory testing, or other testing)?",
+          "id": "q11",
+          "question": "Can the genetic disorder be diagnosed or ruled out through means other than genetic testing (e.g., clinical examination, imaging, laboratory testing, or other testing)?",
           "type": "radio",
           "options": ["Yes", "No"],
           "required": true,
@@ -57,7 +131,7 @@
           }
         },
         {
-          "id": "q6",
+          "id": "q12",
           "question": "Has this test been performed previously?",
           "type": "radio",
           "options": ["Yes", "No"],
@@ -69,14 +143,14 @@
           }
         },
         {
-          "id": "q7",
-          "question": "What is the specific reason why the requested genetic test is being ordered for the individual?",
+          "id": "q13",
+          "question": "What is the specific reason why the requested genetic test is being ordered for the individual? As part of this explanation, please include the algorithm/evidence-based clinical guidelines that were used to aid in your decision making (e.g., NCCN Guidelines®).",
           "type": "text_area",
           "required": true,
-          "placeholder": "Please provide detailed explanation..."
+          "placeholder": "Please provide detailed explanation including clinical guidelines used..."
         },
         {
-          "id": "q8",
+          "id": "q14",
           "question": "List all examinations, laboratory tests, imaging, and diagnostic studies that have been performed as part of the evaluation of the individual. Please attach results.",
           "type": "text_area",
           "required": true,
@@ -360,9 +434,8 @@
       "questions": [
         {
           "id": "certification_statement",
-          "question": "Certification Statement:",
+          "question": "Certification Statement: This is to certify that the requested testing is medically indicated and is reasonable and necessary for the treatment of this patient and that a prescribing practitioner signed order is on file. This form and any statement on my letterhead attached hereto has been completed by me or by my employee and reviewed by me. The foregoing information is true, accurate and complete, and I understand that any falsification, omission, or concealment of material fact may subject me to civil and criminal liability.",
           "type": "statement",
-          "content": "This is to certify that the requested testing is medically indicated and is reasonable and necessary for the treatment of this patient and that a prescribing practitioner signed order is on file. This form and any statement on my letterhead attached hereto has been completed by me or by my employee and reviewed by me. The foregoing information is true, accurate and complete, and I understand that any falsification, omission, or concealment of material fact may subject me to civil and criminal liability.",
           "required": true
         },
         {

@@ -352,8 +352,8 @@
       }
     },
     "coverage": {
-      "payer": "HUSKY Health",
-      "plan_type": "Medicaid",
+      "payer": "Medicare",
+      "plan_type": "Medicare",
       "member_id": "1440801160",
       "group_id": "37552",
       "effective_start": "2024-04-18",

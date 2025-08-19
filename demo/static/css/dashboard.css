@@ -5667,6 +5667,129 @@
 
 /* Error message styling */
 .error-message {
+
+/* Statement question styling */
+.statement-question {
+    background-color: #f8f9fa;
+    border-left: 4px solid #17a2b8;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 4px;
+}
+
+.statement-question .question-text {
+    color: #495057;
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+
+
+
+/* Follow-up question styling */
+.follow-up-container {
+    margin-top: 15px;
+    padding-left: 20px;
+    border-left: 3px solid #28a745;
+    background: rgba(40, 167, 69, 0.05);
+    border-radius: 0 4px 4px 0;
+}
+
+.follow-up-question {
+    padding: 15px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.follow-up-text {
+    color: #28a745;
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+
+.follow-up-text i {
+    margin-right: 8px;
+    color: #28a745;
+}
+
+.follow-up-field {
+    border-color: #28a745;
+}
+
+.follow-up-field:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+/* Table input styling */
+.table-input-container {
+    margin: 10px 0;
+}
+
+.table-input {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.table-input th {
+    background: #f8f9fa;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.9em;
+    color: #495057;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.table-input td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.table-input tr:last-child td {
+    border-bottom: none;
+}
+
+.table-cell-input {
+    width: 100%;
+    border: none;
+    outline: none;
+    padding: 4px 8px;
+    font-size: 0.9em;
+    background: transparent;
+}
+
+.table-cell-input:focus {
+    background: #f8f9fa;
+    border-radius: 3px;
+}
+
+/* Provider subsection styling */
+.provider-subsection {
+    margin: 20px 0;
+    padding: 15px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background: #f8f9fa;
+}
+
+.subsection-title {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.provider-field {
+    background: white;
+    margin: 10px 0;
+    border-radius: 4px;
+}
     background: #f8d7da;
     color: #721c24;
     padding: 15px;
