@@ -377,7 +377,7 @@
     },
     "diagnosis_and_stage": {
       "primary_icd10": "C18.7",
-      "description": "Metastatic colorectal adenocarcinoma, sigmoid",
+      "description": "Metastatic colorectal cancer",
       "ajcc_edition": "8",
       "tnm": "T3N1M1",
       "stage_group": "IV",
@@ -403,11 +403,11 @@
     "genomic_testing": {
       "current_test": {
         "test_id": "fa345ad1-bbb5-4e2d-8e2f-d626b25c62e8",
-        "test_name": "Tumor/Normal Exome with RNA Fusion",
-        "cpt": "81455",
-        "loinc_report": "81247-9",
-        "methodology": "DNA/RNA hybrid capture",
-        "genes_analyzed": 372,
+        "test_name": "BRAF p.V600E Targeted Mutation Analysis (Tumor)",
+        "cpt": "81241",
+        "loinc_report": "-",
+        "methodology": "Allele-specific PCR / real-time PCR",
+        "genes_analyzed": 1,
         "lab": {
           "lab_name": "Precision Genomics Lab",
           "clia": "33D1234567",
@@ -427,50 +427,35 @@
               "gene": "BRAF",
               "hgvs": "c.1799T>A (p.V600E)",
               "tier": "I"
-            },
-            {
-              "gene": "KRAS",
-              "hgvs": "Wild-type",
-              "tier": "NA"
-            },
-            {
-              "gene": "NRAS",
-              "hgvs": "Wild-type",
-              "tier": "NA"
             }
-          ],
-          "summary_metrics": {
-            "MSI": "High",
-            "TMB": 40,
-            "PD-L1_cps": 5
-          },
-          "rna_fusion_panel": "No actionable fusions detected",
-          "mmr_workup": {
-            "mlh1_pms2": "Loss",
-            "msh2_msh6": "Intact",
-            "mlh1_promoter_methylation": "Positive"
-          }
+          ]
         },
         "classification_system": "AMP/ASCO/CAP tiers"
       },
       "prior_tests": [
         {
-          "test_name": "MMR IHC",
           "date": "2024-06-01",
-          "result": "MLH1/PMS2 loss; MSH2/MSH6 intact",
-          "lab": "Department of Pathology"
+          "name": "MMR IHC",
+          "method": "IHC",
+          "result": "Loss of MLH1/PMS2; MSH2/MSH6 retained"
         },
         {
-          "test_name": "MLH1 Promoter Methylation",
           "date": "2024-06-04",
-          "result": "Positive",
-          "lab": "Department of Pathology"
+          "name": "MLH1 promoter methylation",
+          "method": "PCR",
+          "result": "Positive"
         },
         {
-          "test_name": "RAS Panel PCR",
           "date": "2024-06-05",
-          "result": "KRAS WT; NRAS WT",
-          "lab": "Department of Pathology"
+          "name": "RAS panel",
+          "method": "PCR",
+          "result": "KRAS WT; NRAS WT"
+        },
+        {
+          "date": "2024-07-15",
+          "name": "CEA",
+          "method": "Immunoassay",
+          "result": "16.2 ng/mL"
         }
       ]
     },
@@ -492,7 +477,7 @@
         "findings": "Multiple bilateral pulmonary nodules; largest target lesion 28 mm right upper lobe",
         "accession": "ACC774079"
       }
-    ],
+      ],
     "labs": [
       {
         "loinc": "718-7",
@@ -521,27 +506,6 @@
         "value": 3.47,
         "unit": "g/dL",
         "date": "2025-03-14"
-      },
-      {
-        "loinc": "2039-6",
-        "name": "CEA [Mass/volume]",
-        "value": 16.2,
-        "unit": "ng/mL",
-        "date": "2024-07-15"
-      },
-      {
-        "loinc": "2039-6",
-        "name": "CEA [Mass/volume]",
-        "value": 12.8,
-        "unit": "ng/mL",
-        "date": "2024-10-01"
-      },
-      {
-        "loinc": "2039-6",
-        "name": "CEA [Mass/volume]",
-        "value": 11.9,
-        "unit": "ng/mL",
-        "date": "2025-02-10"
       }
     ],
     "family_history": [
@@ -573,20 +537,20 @@
       "pa_id": "PA7073292",
       "status": "Pending clinical review",
       "service_request": {
-        "cpt": "81455",
+        "cpt": "81241",
         "icd10": "C18.7",
-        "description": "Tumor/Normal Exome with RNA Fusion",
+        "description": "BRAF p.V600E Targeted Mutation Analysis (Tumor)",
         "units": 1,
         "dos": "2025-02-05",
         "place_of_service": "11 (Office)"
       },
       "payerspecific": {
-        "ncd_90_2_applicable": true,
+        "ncd_90_2_applicable": false,
         "meets_criteria_flags": {
           "has_cancer_dx": true,
           "advanced_or_metastatic": true,
-          "fda_approved_cdx_or_mac_coverage": true,
-          "no_prior_comprehensive_ngs_same_tumor": true
+          "actionable_biomarker_guides_therapy": true,
+          "no_prior_braf_test_on_this_tumor": true
         }
       },
       "attachments": [
@@ -618,49 +582,49 @@
         "type": "Progress Note (SOAP)",
         "author": "Dr. Jordan Rivera",
         "date": "2025-01-13",
-        "text": "S: Mia Anderson seen in clinic for follow-up of Metastatic colorectal adenocarcinoma, sigmoid, stage IV. Reports fatigue level 3/10, mild dyspnea on exertion. No fever, chest pain, or bleeding. \nO: ECOG 1. Vitals stable. Lungs clear. No focal neurologic deficits. Labs reviewed: Cr 1.34 mg/dL; Hgb 12.5 g/dL; CEA trending down from 16.2 to 11.9 ng/mL.\nA: Metastatic colorectal adenocarcinoma, sigmoid, on active treatment with pembrolizumab. Comprehensive genomic profiling completed: BRAF V600E, KRAS/NRAS WT, MSI-H, TMB 40. Results support ongoing immunotherapy and identify BRAF-directed therapy options at progression.\nP: Continue pembrolizumab. On progression, consider encorafenib + cetuximab (BRAF V600E, RAS WT). Results enable targeted therapy selection and trial eligibility. Prior authorization submitted with complete supporting documentation."
+        "text": "S: Mia Anderson seen for follow-up of metastatic colorectal cancer, stage IV. Fatigue 3/10; mild DOE. O: ECOG 1, vitals stable. A: Metastatic CRC. P: Order BRAF p.V600E targeted mutation analysis (CPT 81241) on tumor specimen; submit prior authorization with supporting pathology and limited prior testing."
       },
       {
         "note_id": "0f7afa2b-650c-431b-9138-cb3a23d8b724",
         "type": "Oncology Consult",
         "author": "Dr. Jordan Rivera",
         "date": "2024-07-09",
-        "text": "Reason for consult: Metastatic colorectal cancer. Summary: Mia Anderson presents with Metastatic colorectal cancer. AJCC stage IV. Performance status ECOG 1. Family history reviewed; genetic counseling offered.\nAssessment/Plan: Comprehensive tumor profiling to assess for targetable alterations and to estimate TMB/MSI. Consent obtained for genetic testing. Pathology confirms histology consistent with diagnosis."
+        "text": "Reason: metastatic colorectal cancer. AJCC stage IV; ECOG 1. Family history reviewed; genetic counseling offered. Plan: characterize dMMR status and RAS/BRAF to guide therapy."
       },
       {
         "note_id": "7e8ab43e-fed5-45ea-8294-d9e762b4efed",
         "type": "Pathology Report (Narrative)",
         "author": "Dept. of Pathology",
         "date": "2023-11-29",
-        "text": "Specimen: Excisional biopsy from Colon, sigmoid.\nMicroscopic Description: Invasive carcinoma with G2. Tumor measures 35 mm. Lymphovascular invasion: Absent. Margins: Positive.\nLymph nodes examined: 0, positive: 1. Tumor cellularity estimated at 30%."
+        "text": "Specimen: Excisional biopsy from colon, sigmoid. Adenocarcinoma, G2, 35 mm. LVI absent. Margins positive. Tumor cellularity ~30%."
       },
       {
         "note_id": "d2ccd689-e73a-47c7-a86b-ef9ce26d8eed",
         "type": "Molecular Report (Impression/Comment)",
         "author": "Precision Genomics Lab",
         "date": "2024-08-05",
-        "text": "Comprehensive genomic profiling identified: BRAF c.1799T>A (p.V600E), KRAS Wild-type. \nSummary metrics: TMB 40 mut/Mb; MSI High; PD-L1 CPS 5.\nInterpretation: Detected alterations may confer sensitivity to FDA-labeled targeted therapies or clinical trials. See variant-level evidence annotations. Clinical correlation recommended."
+        "text": "Targeted mutation analysis detected BRAF c.1799T>A (p.V600E) in tumor DNA. RAS status per prior PCR: KRAS WT; NRAS WT. MMR by IHC previously showed MLH1/PMS2 loss with positive MLH1 promoter methylation, consistent with sporadic dMMR. Clinical correlation recommended."
       },
       {
         "note_id": "74e8fc4e-7d2f-442c-88e2-e10ca926fbf5",
         "type": "Genetic Counseling Note",
         "author": "Genetic Counselor, MS, CGC",
         "date": "2025-02-12",
-        "text": "Pre-test counseling conducted. Discussed benefits/limitations of tumor profiling and potential incidental/secondary findings. Consent elements reviewed: purpose/scope, genes/panel scope, privacy/data use, secondary findings, re-contact policy. Patient signed consent; copy filed.\nFamily history notable for: Mother - Breast cancer @ 52, Maternal aunt - Ovarian cancer @ 58.\nPlan: Disclose results with oncology; discuss implications for relatives if germline risk suspected."
+        "text": "Pre-test counseling for tumor biomarkers (BRAF targeted analysis) including benefits/limitations and potential incidental findings. Family history: mother breast @52, maternal aunt ovarian @58. dMMR by IHC with MLH1 methylation positive; Lynch unlikely. Optional germline panel discussed."
       },
       {
         "note_id": "d3a5bca7-9e28-4e26-a9fb-dd98b6ab1869",
         "type": "Utilization Management Communication",
         "author": "Prior Auth Coordinator",
         "date": "2025-07-13",
-        "text": "PA PA7073292 submitted for Tumor/Normal Exome with RNA Fusion (CPT 81455) to Medicare (Medicare Advantage HMO).\nIncluded attachments: pathology synoptic, molecular order, clinic note. Coverage rationale cites NCD 90.2 and plan policy; patient has advanced disease and no prior comprehensive NGS on same primary tumor = criteria met.\nAwaiting response; if pended, will upload additional evidence (progress note, imaging)."
+        "text": "PA PA7073292 submitted for BRAF p.V600E Targeted Mutation Analysis (CPT 81241). Attachments: pathology synoptic, molecular order, clinic note. Rationale: metastatic disease, RAS WT; BRAF status will directly guide targeted therapy and trial eligibility."
       },
       {
         "note_id": "cc7600f3-13a3-4a46-822f-87524cac7007",
         "type": "Radiology Report (Narrative)",
         "author": "Radiology Attending, MD",
         "date": "2025-02-09",
-        "text": "CT CAP: Multiple bilateral pulmonary nodules; largest target lesion 28 mm right upper lobe.\nImpression: Findings compatible with metastatic disease. Recommend correlation with clinical status and tumor kinetics."
+        "text": "CT CAP: Multiple bilateral pulmonary nodules; largest target lesion 28 mm right upper lobe. Impression: Metastatic disease."
       }
     ]
   },

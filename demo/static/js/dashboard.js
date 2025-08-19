@@ -4417,7 +4417,7 @@ async function exportForm() {
     const exportBtn = document.getElementById('export-form-btn');
     const originalText = exportBtn.innerHTML;
     exportBtn.disabled = true;
-    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading PDF...';
+    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
     
     try {
         // Call the PDF export endpoint
@@ -4448,11 +4448,11 @@ async function exportForm() {
         URL.revokeObjectURL(url);
         
         // Show success message
-        showMessage('PDF form downloaded successfully!', 'success');
+        showMessage('PDF form generated successfully based on the filled form data!', 'success');
         
     } catch (error) {
-        console.error('Error downloading PDF:', error);
-        showMessage(`Error downloading PDF: ${error.message}`, 'error');
+        console.error('Error generating PDF:', error);
+        showMessage(`Error generating PDF: ${error.message}`, 'error');
         
     } finally {
         // Reset button state
