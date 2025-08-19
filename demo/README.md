@@ -45,7 +45,7 @@ Both should contain your OpenAI API key.
 1. Set up your environment variables
 2. Install dependencies: `pip install -r requirements.txt`
 3. Run the application: `python app.py`
-4. Open your browser to `http://localhost:5000`
+4. Open your browser to `http://localhost:5001`
 
 ## Features
 
